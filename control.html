@@ -2,219 +2,267 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Signage Layout Controller</title>
+    <title>Signage Pro Controller</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: #1e1e1e; color: #fff; margin: 0; padding: 20px; display: flex; gap: 20px; }
-        .panel { background-color: #2d2d2d; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        .sidebar { width: 350px; flex-shrink: 0; }
-        .main-editor { flex-grow: 1; }
+        body { font-family: 'Segoe UI', sans-serif; background: #1e1e1e; color: #fff; margin: 0; display: flex; height: 100vh; overflow: hidden; }
+        .sidebar { width: 320px; background: #2d2d2d; padding: 20px; overflow-y: auto; border-right: 1px solid #444; }
+        .main-workspace { flex-grow: 1; padding: 20px; display: flex; flex-direction: column; overflow-y: auto; }
         
-        h2, h3 { color: #4CAF50; margin-top: 0; }
-        label { display: block; margin-top: 10px; font-size: 14px; color: #aaa; }
-        select, input, button { width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; border: 1px solid #555; background-color: #1e1e1e; color: #fff; box-sizing: border-box; }
-        
-        button { background-color: #0078D7; border: none; cursor: pointer; font-weight: bold; margin-top: 15px; }
-        button:hover { background-color: #005A9E; }
-        button.danger { background-color: #d32f2f; }
-        button.danger:hover { background-color: #9a0007; }
+        h3 { color: #4CAF50; margin-top: 0; border-bottom: 1px solid #444; padding-bottom: 10px; }
+        button, select, input { width: 100%; padding: 8px; margin-top: 10px; background: #3d3d3d; color: white; border: 1px solid #555; border-radius: 4px; cursor: pointer; }
+        button.primary { background: #0078D7; font-weight: bold; }
+        button.primary:hover { background: #005A9E; }
 
-        /* กล่องตั้งค่า Zone */
-        .zone-card { background-color: #3d3d3d; padding: 15px; border-radius: 6px; margin-top: 15px; }
-        .zone-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        
-        /* พื้นที่ Preview */
-        .preview-container { 
-            background-color: #000; position: relative; margin: 20px auto; border: 2px solid #555;
-            transition: all 0.3s ease; overflow: hidden;
+        /* Media Library */
+        .media-item { background: #444; padding: 8px; margin-top: 8px; border-radius: 4px; cursor: grab; font-size: 12px; word-break: break-all; display: flex; align-items: center; gap: 10px; }
+        .media-item:active { cursor: grabbing; }
+        .media-thumb { width: 40px; height: 40px; object-fit: cover; background: #000; }
+
+        /* Interactive Canvas */
+        .canvas-wrapper { background: #000; position: relative; margin: 20px auto; border: 2px solid #555; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .zone-box {
+            position: absolute; border: 2px dashed #4CAF50; background: rgba(76, 175, 80, 0.2);
+            /* เปิดฟังก์ชัน Resize ของ CSS */
+            resize: both; overflow: hidden;
+            display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;
         }
-        .preview-zone { 
-            position: absolute; border: 1px solid rgba(255,255,255,0.5); 
-            background-color: rgba(76, 175, 80, 0.2); display: flex; justify-content: center; align-items: center; text-align: center; font-size: 12px; color: #fff;
-        }
+        .zone-header { background: #4CAF50; color: #000; width: 100%; font-size: 12px; font-weight: bold; cursor: move; padding: 2px 0; }
+        .zone-content { flex-grow: 1; width: 100%; pointer-events: none; }
+        .zone-content img, .zone-content video { width: 100%; height: 100%; object-fit: cover; }
+
+        /* Layout Tabs */
+        .layout-tabs { display: flex; gap: 5px; margin-bottom: 10px; }
+        .tab { padding: 8px 15px; background: #333; border-radius: 4px; cursor: pointer; }
+        .tab.active { background: #4CAF50; color: #000; font-weight: bold; }
     </style>
 </head>
 <body>
 
-    <div class="panel sidebar">
-        <h2>Control Panel</h2>
-        <label>เลือกจอภาพ (Screen):</label>
-        <select id="screen-select" onchange="loadScreenData()">
+    <div class="sidebar">
+        <h3>1. เลือกจอภาพ</h3>
+        <select id="screen-select" onchange="loadData()">
             <option value="01">Screen 01</option>
             <option value="02">Screen 02</option>
-            <option value="03">Screen 03</option>
-            <option value="04">Screen 04</option>
-            <option value="05">Screen 05</option>
-            <option value="06">Screen 06</option>
-            <option value="07">Screen 07</option>
-            <option value="08">Screen 08</option>
-            <option value="09">Screen 09</option>
-            <option value="10">Screen 10</option>
+        </select>
+        
+        <select id="orientation-select" onchange="updateCanvas()">
+            <option value="landscape">แนวนอน (16:9)</option>
+            <option value="portrait">แนวตั้ง (9:16)</option>
         </select>
 
-        <label>การวางแนวจอ (Orientation):</label>
-        <select id="orientation-select" onchange="updatePreview()">
-            <option value="landscape">แนวนอน (Landscape - 16:9)</option>
-            <option value="portrait">แนวตั้ง (Portrait - 9:16)</option>
-        </select>
+        <h3 style="margin-top: 30px;">2. คลังสื่อ (Media Library)</h3>
+        <input type="file" id="file-upload" accept="image/*,video/*">
+        <button onclick="uploadFile()" class="primary">อัปโหลดไฟล์</button>
+        <progress id="upload-progress" value="0" max="100" style="width: 100%; display: none; margin-top: 10px;"></progress>
+        
+        <div id="media-list" style="margin-top: 15px;">
+            </div>
 
-        <button onclick="addZone()" style="background-color: #4CAF50;">+ เพิ่มกรอบ (Add Zone)</button>
-        <button onclick="saveToFirebase()" style="padding: 12px; font-size: 16px;">บันทึกและส่งขึ้นจอ (Deploy)</button>
+        <button onclick="saveDeploy()" class="primary" style="margin-top: 40px; padding: 15px; background: #4CAF50;">บันทึก & ส่งขึ้นจอ</button>
     </div>
 
-    <div class="panel main-editor">
-        <h3>Layout Builder</h3>
+    <div class="main-workspace">
+        <h3>3. จัดการ Layouts (ระบบเล่นวน Loop)</h3>
         
-        <div id="preview-box" class="preview-container" style="width: 640px; height: 360px;"></div>
+        <div class="layout-tabs" id="tabs-container"></div>
+        <button onclick="addLayout()" style="width: auto; padding: 5px 15px;">+ เพิ่ม Layout ใหม่</button>
+        
+        <div style="margin-top: 15px; display: flex; gap: 15px; align-items: center;">
+            <label>เวลาแสดงผล (วินาที):</label>
+            <input type="number" id="layout-duration" value="10" style="width: 100px; margin: 0;" onchange="updateDuration(this.value)">
+            <button onclick="addZone()" style="width: auto; margin: 0; background: #ff9800;">+ เพิ่มกรอบ (Zone)</button>
+        </div>
 
-        <div id="zones-container">
-            </div>
+        <div id="canvas" class="canvas-wrapper" style="width: 800px; height: 450px;"></div>
     </div>
 
     <script type="module">
-        import { db, ref, set, onValue } from './firebase-config.js';
+        import { db, ref, set, onValue, storage, storageRef, uploadBytesResumable, getDownloadURL } from './firebase-config.js';
 
-        let currentZones = [];
+        // State ของระบบ
+        let currentScreen = '01';
+        let orientation = 'landscape';
+        let layouts = [{ id: 'L1', duration: 10, zones: [] }];
+        let activeLayoutIndex = 0;
+        let uploadedFiles = []; // เก็บประวัติไฟล์ในเซสชันนี้
 
-        // ทำให้ฟังก์ชันเป็น Global เพื่อให้ปุ่ม HTML เรียกใช้ได้
-        window.loadScreenData = loadScreenData;
-        window.addZone = addZone;
-        window.removeZone = removeZone;
-        window.updatePreview = updatePreview;
-        window.saveToFirebase = saveToFirebase;
-
-        function loadScreenData() {
-            const screenId = document.getElementById('screen-select').value;
-            const displayRef = ref(db, 'displays/display_' + screenId);
-            
-            // ดึงข้อมูลครั้งเดียวเพื่อมาแก้ไข
-            onValue(displayRef, (snapshot) => {
+        window.loadData = function() {
+            currentScreen = document.getElementById('screen-select').value;
+            onValue(ref(db, 'displays/display_' + currentScreen), (snapshot) => {
                 const data = snapshot.val();
-                if (data) {
-                    document.getElementById('orientation-select').value = data.orientation || 'landscape';
-                    currentZones = data.zones || [];
+                if(data && data.layouts) {
+                    orientation = data.orientation || 'landscape';
+                    layouts = data.layouts;
                 } else {
-                    // ค่าเริ่มต้นถ้ายังไม่มีข้อมูล
-                    document.getElementById('orientation-select').value = 'landscape';
-                    currentZones = [];
+                    layouts = [{ id: 'L1', duration: 10, zones: [] }];
                 }
-                renderZonesEditor();
-                updatePreview();
+                document.getElementById('orientation-select').value = orientation;
+                activeLayoutIndex = 0;
+                renderTabs();
+                renderCanvas();
             }, { onlyOnce: true });
         }
 
-        function addZone() {
-            currentZones.push({
-                id: 'zone_' + Date.now(),
-                type: 'image',
-                content: '',
-                top: 0, left: 0, width: 50, height: 50 // ค่าเริ่มต้นเป็น %
-            });
-            renderZonesEditor();
-            updatePreview();
+        // --- ระบบอัปโหลดและจัดการไฟล์ ---
+        window.uploadFile = function() {
+            const file = document.getElementById('file-upload').files[0];
+            if(!file) return alert('กรุณาเลือกไฟล์ก่อน');
+            
+            const fileRef = storageRef(storage, 'signage_media/' + Date.now() + '_' + file.name);
+            const uploadTask = uploadBytesResumable(fileRef, file);
+            const progressBar = document.getElementById('upload-progress');
+            progressBar.style.display = 'block';
+
+            uploadTask.on('state_changed', 
+                (snapshot) => {
+                    progressBar.value = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                }, 
+                (error) => alert('อัปโหลดล้มเหลว: ' + error), 
+                () => {
+                    getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
+                        progressBar.style.display = 'none';
+                        const type = file.type.startsWith('video') ? 'video' : 'image';
+                        uploadedFiles.push({ url: downloadURL, name: file.name, type: type });
+                        renderMediaList();
+                    });
+                }
+            );
         }
 
-        function removeZone(index) {
-            currentZones.splice(index, 1);
-            renderZonesEditor();
-            updatePreview();
-        }
-
-        function renderZonesEditor() {
-            const container = document.getElementById('zones-container');
-            container.innerHTML = ''; // เคลียร์ของเก่า
-
-            currentZones.forEach((zone, index) => {
-                const zoneHTML = `
-                    <div class="zone-card">
-                        <div style="display: flex; justify-content: space-between;">
-                            <strong>กรอบที่ ${index + 1} (${zone.type})</strong>
-                            <button class="danger" style="width: auto; margin:0; padding: 4px 8px;" onclick="removeZone(${index})">ลบ</button>
+        function renderMediaList() {
+            const list = document.getElementById('media-list');
+            list.innerHTML = '';
+            uploadedFiles.forEach(file => {
+                // ลากไฟล์ได้: กำหนด ondragstart เพื่อส่ง Data URL
+                list.innerHTML += `
+                    <div class="media-item" draggable="true" ondragstart="event.dataTransfer.setData('mediaUrl', '${file.url}'); event.dataTransfer.setData('mediaType', '${file.type}');">
+                        <div class="media-thumb">
+                            ${file.type === 'image' ? `<img src="${file.url}" width="100%" height="100%">` : `<span style="display:block;text-align:center;color:#fff;margin-top:10px;">🎥</span>`}
                         </div>
-                        <div class="zone-grid">
-                            <div>
-                                <label>ตำแหน่งแนวตั้ง Top (%)</label>
-                                <input type="number" value="${zone.top}" onchange="updateZoneData(${index}, 'top', this.value)">
-                            </div>
-                            <div>
-                                <label>ตำแหน่งแนวนอน Left (%)</label>
-                                <input type="number" value="${zone.left}" onchange="updateZoneData(${index}, 'left', this.value)">
-                            </div>
-                            <div>
-                                <label>ความกว้าง Width (%)</label>
-                                <input type="number" value="${zone.width}" onchange="updateZoneData(${index}, 'width', this.value)">
-                            </div>
-                            <div>
-                                <label>ความสูง Height (%)</label>
-                                <input type="number" value="${zone.height}" onchange="updateZoneData(${index}, 'height', this.value)">
-                            </div>
-                        </div>
-                        <label>ประเภทสื่อ (Media Type)</label>
-                        <select onchange="updateZoneData(${index}, 'type', this.value)">
-                            <option value="image" ${zone.type === 'image' ? 'selected' : ''}>รูปภาพ (Image URL)</option>
-                            <option value="video" ${zone.type === 'video' ? 'selected' : ''}>วิดีโอเล่นวน (Video URL)</option>
-                            <option value="marquee" ${zone.type === 'marquee' ? 'selected' : ''}>ข้อความตัววิ่ง (Marquee Text)</option>
-                        </select>
-                        <label>ข้อมูล (URL ของไฟล์ หรือ ข้อความ)</label>
-                        <input type="text" value="${zone.content}" onchange="updateZoneData(${index}, 'content', this.value)" placeholder="ใส่ URL หรือข้อความที่นี่...">
+                        <div>${file.name}</div>
                     </div>
                 `;
-                container.innerHTML += zoneHTML;
             });
         }
 
-        window.updateZoneData = function(index, field, value) {
-            if(['top', 'left', 'width', 'height'].includes(field)) {
-                currentZones[index][field] = Number(value);
-            } else {
-                currentZones[index][field] = value;
-            }
-            updatePreview();
+        // --- ระบบจัดการ Layout ---
+        window.addLayout = function() {
+            layouts.push({ id: 'L' + (layouts.length + 1), duration: 10, zones: [] });
+            activeLayoutIndex = layouts.length - 1;
+            renderTabs(); renderCanvas();
         }
 
-        function updatePreview() {
-            const previewBox = document.getElementById('preview-box');
-            const orientation = document.getElementById('orientation-select').value;
-            
-            // ปรับขนาดกล่อง Preview ตามแนวตั้ง/แนวนอน
-            if(orientation === 'landscape') {
-                previewBox.style.width = '640px';
-                previewBox.style.height = '360px';
-            } else {
-                previewBox.style.width = '360px';
-                previewBox.style.height = '640px';
-            }
+        window.switchLayout = function(index) {
+            activeLayoutIndex = index;
+            renderTabs(); renderCanvas();
+        }
 
-            // วาดกรอบจำลอง
-            previewBox.innerHTML = '';
-            currentZones.forEach((zone, index) => {
-                const zoneDiv = document.createElement('div');
-                zoneDiv.className = 'preview-zone';
-                zoneDiv.style.top = zone.top + '%';
-                zoneDiv.style.left = zone.left + '%';
-                zoneDiv.style.width = zone.width + '%';
-                zoneDiv.style.height = zone.height + '%';
-                zoneDiv.innerText = `กรอบ ${index + 1}\n(${zone.type})`;
-                previewBox.appendChild(zoneDiv);
+        window.updateDuration = function(val) {
+            layouts[activeLayoutIndex].duration = Number(val);
+        }
+
+        function renderTabs() {
+            const container = document.getElementById('tabs-container');
+            container.innerHTML = '';
+            layouts.forEach((l, i) => {
+                container.innerHTML += `<div class="tab ${i === activeLayoutIndex ? 'active' : ''}" onclick="switchLayout(${i})">Layout ${i+1}</div>`;
+            });
+            document.getElementById('layout-duration').value = layouts[activeLayoutIndex].duration;
+        }
+
+        // --- ระบบจัดการ Canvas (Drag & Resize) ---
+        window.updateCanvas = function() {
+            orientation = document.getElementById('orientation-select').value;
+            const canvas = document.getElementById('canvas');
+            if(orientation === 'landscape') { canvas.style.width = '800px'; canvas.style.height = '450px'; }
+            else { canvas.style.width = '350px'; canvas.style.height = '622px'; }
+            renderCanvas();
+        }
+
+        window.addZone = function() {
+            layouts[activeLayoutIndex].zones.push({ id: Date.now(), top: 10, left: 10, width: 30, height: 30, url: '', type: '' });
+            renderCanvas();
+        }
+
+        function renderCanvas() {
+            const canvas = document.getElementById('canvas');
+            canvas.innerHTML = '';
+            const zones = layouts[activeLayoutIndex].zones || [];
+            
+            zones.forEach((zone, index) => {
+                const el = document.createElement('div');
+                el.className = 'zone-box';
+                el.style.top = zone.top + '%'; el.style.left = zone.left + '%';
+                el.style.width = zone.width + '%'; el.style.height = zone.height + '%';
+                
+                // รองรับการลากไฟล์มาวาง (Drop)
+                el.ondragover = (e) => e.preventDefault();
+                el.ondrop = (e) => {
+                    e.preventDefault();
+                    zone.url = e.dataTransfer.getData('mediaUrl');
+                    zone.type = e.dataTransfer.getData('mediaType');
+                    renderCanvas(); // วาดใหม่เพื่อแสดงสื่อ
+                };
+
+                // เนื้อหาสื่อภายในกล่อง
+                let mediaHtml = `<div style="color:#aaa; font-size:12px;">ลากไฟล์มาวางที่นี่</div>`;
+                if(zone.url) {
+                    if(zone.type === 'video') mediaHtml = `<video src="${zone.url}" autoplay loop muted></video>`;
+                    else mediaHtml = `<img src="${zone.url}">`;
+                }
+
+                el.innerHTML = `
+                    <div class="zone-header" onmousedown="startDrag(event, ${index})">Drag Move (Zone ${index+1})</div>
+                    <div class="zone-content">${mediaHtml}</div>
+                `;
+
+                // เมื่อมีการ Resize กล่อง (จับ Event mouseup) ให้คำนวณ % กลับไปที่ Data
+                el.onmouseup = () => {
+                    zone.width = (el.offsetWidth / canvas.offsetWidth) * 100;
+                    zone.height = (el.offsetHeight / canvas.offsetHeight) * 100;
+                };
+
+                canvas.appendChild(el);
             });
         }
 
-        function saveToFirebase() {
-            const screenId = document.getElementById('screen-select').value;
-            const orientation = document.getElementById('orientation-select').value;
+        // ฟังก์ชันลากกล่อง (Drag to Move)
+        window.startDrag = function(e, zoneIndex) {
+            e.preventDefault();
+            const canvas = document.getElementById('canvas');
+            const zoneData = layouts[activeLayoutIndex].zones[zoneIndex];
             
-            const layoutData = {
-                orientation: orientation,
-                zones: currentZones
-            };
+            // ตำแหน่งเริ่มต้นของเมาส์
+            let startY = e.clientY;
+            let startX = e.clientX;
+            let startTop = zoneData.top;
+            let startLeft = zoneData.left;
 
-            set(ref(db, 'displays/display_' + screenId), layoutData)
-                .then(() => alert(`ส่งข้อมูลไปที่ Screen ${screenId} เรียบร้อยแล้ว!`))
-                .catch((error) => alert('เกิดข้อผิดพลาด: ' + error));
+            function onMouseMove(ev) {
+                // คำนวณระยะที่เลื่อนไป แปลงเป็น %
+                const dy = ((ev.clientY - startY) / canvas.offsetHeight) * 100;
+                const dx = ((ev.clientX - startX) / canvas.offsetWidth) * 100;
+                zoneData.top = startTop + dy;
+                zoneData.left = startLeft + dx;
+                renderCanvas(); // อัปเดตตำแหน่งสดๆ
+            }
+
+            function onMouseUp() {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+            }
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
         }
 
-        // โหลดข้อมูลจอที่ 1 ทันทีเมื่อเปิดหน้า
-        window.onload = loadScreenData;
+        window.saveDeploy = function() {
+            const payload = { orientation: orientation, layouts: layouts };
+            set(ref(db, 'displays/display_' + currentScreen), payload)
+                .then(() => alert(`บันทึกและส่งข้อมูลขึ้น ${currentScreen} เรียบร้อย!`));
+        }
+
+        window.onload = loadData;
     </script>
 </body>
 </html>
