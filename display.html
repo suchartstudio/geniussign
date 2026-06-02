@@ -2,77 +2,92 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <title>Digital Signage Display</title>
+    <title>Digital Signage Player</title>
     <style>
-        /* รีเซ็ตหน้าจอให้เต็มพื้นที่ ไม่มีขอบขาว */
-        body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; background-color: #000; overflow: hidden; font-family: sans-serif; }
+        body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; background: #000; overflow: hidden; }
+        #player-container { position: relative; width: 100%; height: 100%; }
         
-        #screen-container { position: relative; width: 100%; height: 100%; }
-
-        /* คลาสพื้นฐานสำหรับทุก Zone */
-        .zone-element { position: absolute; overflow: hidden; display: flex; align-items: center; justify-content: center; }
-        
-        /* สื่อเต็มพื้นที่ Zone */
+        .zone-element { position: absolute; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #111; }
         .zone-media { width: 100%; height: 100%; object-fit: cover; }
         
-        /* CSS สำหรับข้อความตัววิ่ง */
-        .marquee-container { background-color: #002244; color: #FFF; width: 100%; height: 100%; display: flex; align-items: center; white-space: nowrap; overflow: hidden; }
-        .marquee-text { font-size: 4vh; padding-left: 100%; animation: scroll-left 15s linear infinite; }
-        @keyframes scroll-left { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
+        /* Transition นุ่มนวลตอนสลับ Layout */
+        .fade-in { animation: fadeIn 1s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
 </head>
 <body>
 
-    <div id="screen-container">
-        <h1 style="color:#333; text-align:center; padding-top: 40vh;">รอรับข้อมูลจาก Control Panel...</h1>
+    <div id="player-container">
+        <h1 style="color:#555; text-align:center; padding-top: 40vh; font-family: sans-serif;">Connecting to Firebase...</h1>
     </div>
 
     <script type="module">
         import { db, ref, onValue } from './firebase-config.js';
 
-        // *** เปลี่ยนตัวเลขนี้ตามเครื่องที่จะใช้แสดงผล (01 ถึง 10) ***
+        // *** กำหนดเลขจอที่ต้องการเปิด ***
         const DISPLAY_ID = '01'; 
         
-        const screenContainer = document.getElementById('screen-container');
+        const container = document.getElementById('player-container');
+        let layouts = [];
+        let currentLayoutIndex = 0;
+        let loopTimer = null;
 
-        const displayRef = ref(db, 'displays/display_' + DISPLAY_ID);
-        onValue(displayRef, (snapshot) => {
+        // รับข้อมูลจาก Firebase
+        onValue(ref(db, 'displays/display_' + DISPLAY_ID), (snapshot) => {
             const data = snapshot.val();
-            if(!data) return;
+            if(!data || !data.layouts) return;
 
-            // 1. จัดการการวางแนวจอ (ถ้าต้องการบังคับผ่าน CSS เพิ่มเติม สามารถเขียนเงื่อนไขที่นี่)
-            // โดยปกติ browser จะ render ตาม resolution จอจริงอยู่แล้ว
+            layouts = data.layouts;
+            currentLayoutIndex = 0;
+            
+            // เริ่มเล่น Playlist ทันทีที่ข้อมูลมา
+            playCurrentLayout();
+        });
 
-            // 2. ล้างหน้าจอเก่า
-            screenContainer.innerHTML = '';
+        function playCurrentLayout() {
+            if(layouts.length === 0) return;
 
-            // 3. วาด Zones ใหม่
-            const zones = data.zones || [];
+            // ล้าง Timer เก่าออก
+            if(loopTimer) clearTimeout(loopTimer);
+
+            const layout = layouts[currentLayoutIndex];
+            renderLayout(layout);
+
+            // ตั้งเวลาเพื่อเปลี่ยนไป Layout ถัดไป (คูณ 1000 เพื่อแปลงวินาทีเป็นมิลลิวินาที)
+            const durationMs = (layout.duration || 10) * 1000;
+            
+            loopTimer = setTimeout(() => {
+                // เลื่อน index ไปอันถัดไป ถ้าหมดแล้วให้กลับไป 0
+                currentLayoutIndex = (currentLayoutIndex + 1) % layouts.length;
+                playCurrentLayout();
+            }, durationMs);
+        }
+
+        function renderLayout(layout) {
+            container.innerHTML = ''; // ล้างจอเก่า
+            
+            // วาดกล่อง Zone ทุกอันใน Layout นี้
+            const zones = layout.zones || [];
             zones.forEach(zone => {
                 const zoneDiv = document.createElement('div');
-                zoneDiv.className = 'zone-element';
+                zoneDiv.className = 'zone-element fade-in';
                 zoneDiv.style.top = zone.top + '%';
                 zoneDiv.style.left = zone.left + '%';
                 zoneDiv.style.width = zone.width + '%';
                 zoneDiv.style.height = zone.height + '%';
 
-                // กำหนดประเภทการแสดงผล
-                if (zone.type === 'image') {
-                    zoneDiv.innerHTML = `<img src="${zone.content}" class="zone-media" alt="Image Media">`;
-                } 
-                else if (zone.type === 'video') {
-                    zoneDiv.innerHTML = `<video src="${zone.content}" class="zone-media" autoplay loop muted playsinline></video>`;
-                } 
-                else if (zone.type === 'marquee') {
-                    zoneDiv.innerHTML = `
-                        <div class="marquee-container">
-                            <div class="marquee-text">${zone.content}</div>
-                        </div>`;
+                if(zone.url) {
+                    if (zone.type === 'video') {
+                        // ซ่อนปุ่มควบคุม, เล่นอัตโนมัติ, เล่นวน, ปิดเสียง
+                        zoneDiv.innerHTML = `<video src="${zone.url}" class="zone-media" autoplay loop muted playsinline></video>`;
+                    } else {
+                        zoneDiv.innerHTML = `<img src="${zone.url}" class="zone-media">`;
+                    }
                 }
-
-                screenContainer.appendChild(zoneDiv);
+                
+                container.appendChild(zoneDiv);
             });
-        });
+        }
     </script>
 </body>
 </html>
