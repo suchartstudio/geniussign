@@ -7,14 +7,10 @@
     <style>
         body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; background: #000; overflow: hidden; font-family: 'Prompt', sans-serif; transition: font-family 0.3s; }
         #player-container { position: relative; width: 100%; height: 100%; }
-        
         .zone-element { position: absolute; overflow: hidden; background: #000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-        
         .zone-media { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: fill; opacity: 0; transition: opacity 1s ease-in-out; }
         .zone-media.active { opacity: 1; z-index: 2; }
         .zone-media.fade-out { opacity: 0; z-index: 1; }
-        
-        /* สไตล์สำหรับ Widget นาฬิกา */
         .clock-container { width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #0a0a0a; color: #fff; z-index: 5; text-align: center; }
         .clock-time { font-size: 15vh; font-weight: 700; line-height: 1; margin-bottom: 2vh; text-shadow: 0 0 20px rgba(0, 188, 212, 0.5); color: #00bcd4; }
         .clock-date { font-size: 5vh; font-weight: 400; color: #ccc; }
@@ -27,10 +23,26 @@
     </div>
 
     <script type="module">
-        import { db, ref, onValue } from './firebase-config.js';
+        import { db, ref, onValue, set, onDisconnect } from './firebase-config.js';
 
-        // *** กำหนดเลขจอที่ต้องการเปิด (01 - 10) ***
-        const DISPLAY_ID = '01'; 
+        // อ่านค่าพารามิเตอร์จาก URL เช่น ?screen=02 (ถ้าไม่มีให้เป็น 01)
+        const urlParams = new URLSearchParams(window.location.search);
+        const DISPLAY_ID = urlParams.get('screen') || '01'; 
+        
+        // --- ระบบ Presence (รายงานตัวว่าออนไลน์) ---
+        const connectedRef = ref(db, '.info/connected');
+        const presenceRef = ref(db, 'displays/display_' + DISPLAY_ID + '/presence');
+
+        onValue(connectedRef, (snap) => {
+            if (snap.val() === true) {
+                // เมื่อต่อเน็ตได้ ให้ตั้งค่าล่วงหน้าว่า ถ้าเน็ตหลุด ให้ Firebase แก้ค่าเป็น 'offline'
+                onDisconnect(presenceRef).set('offline').then(() => {
+                    // แล้วค่อยอัปเดตสถานะปัจจุบันเป็น 'online'
+                    set(presenceRef, 'online');
+                });
+            }
+        });
+        // ----------------------------------------
         
         const container = document.getElementById('player-container');
         let layouts = [];
@@ -42,7 +54,6 @@
             const data = snapshot.val();
             if(!data || !data.layouts) return;
 
-            // จัดการอัปเดตฟอนต์ตามที่ตั้งค่า
             if (data.globalFont) {
                 const fontUrl = `https://fonts.googleapis.com/css2?family=${data.globalFont.replace(/ /g, '+')}:wght@300;400;500;700&display=swap`;
                 document.getElementById('dynamic-font').href = fontUrl;
@@ -102,7 +113,6 @@
         function renderClockZone(zoneDiv) {
             const clockHtml = `<div class="clock-container"><div class="clock-time">00:00:00</div><div class="clock-date">วัน เดือน ปี</div></div>`;
             zoneDiv.innerHTML = clockHtml;
-            
             const timeEl = zoneDiv.querySelector('.clock-time');
             const dateEl = zoneDiv.querySelector('.clock-date');
             
@@ -111,7 +121,6 @@
                 timeEl.innerText = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
                 dateEl.innerText = now.toLocaleDateString('th-TH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
             };
-            
             updateClock();
             const timer = setInterval(updateClock, 1000);
             return () => clearInterval(timer);
@@ -125,7 +134,6 @@
                     currentElement.classList.remove('active'); currentElement.classList.add('fade-out');
                     setTimeout((el) => { if(el && el.parentNode) el.parentNode.removeChild(el); }, 1000, currentElement);
                 }
-
                 const item = playlist[currentIndex];
                 let nextElement;
 
