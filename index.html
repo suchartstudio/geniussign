@@ -3,10 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <title>Signage System Status</title>
+    <!-- เพิ่ม Google Font: Prompt -->
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #121212; color: #fff; margin: 0; padding: 30px; }
+        body { font-family: 'Prompt', sans-serif; background: #121212; color: #fff; margin: 0; padding: 30px; }
         .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }
-        .btn-admin { background: #4CAF50; color: #000; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 16px; }
+        .btn-admin { background: #4CAF50; color: #000; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 16px; font-family: 'Prompt', sans-serif; }
         .btn-admin:hover { background: #45a049; }
         
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
@@ -16,30 +18,20 @@
     </style>
 </head>
 <body>
-
     <div class="header">
         <h1>ระบบควบคุมจอภาพ (Digital Signage Status)</h1>
         <button class="btn-admin" onclick="loginToControl()">เข้าสู่หน้า Control Panel</button>
     </div>
-
-    <div class="grid" id="status-grid">
-        </div>
+    <div class="grid" id="status-grid"></div>
 
     <script type="module">
         import { db, ref, onValue } from './firebase-config.js';
 
-        // วาดการ์ด 10 จอรอไว้
         const grid = document.getElementById('status-grid');
         for(let i=1; i<=10; i++) {
             let id = i < 10 ? '0'+i : i.toString();
-            grid.innerHTML += `
-                <div class="screen-card" id="card-${id}">
-                    <h3>Screen ${id} <span style="font-size: 12px; color:#aaa;" id="ori-${id}">...</span></h3>
-                    <div class="status" id="status-${id}">กำลังเชื่อมต่อข้อมูล...</div>
-                </div>
-            `;
+            grid.innerHTML += `<div class="screen-card" id="card-${id}"><h3>Screen ${id} <span style="font-size: 12px; color:#aaa;" id="ori-${id}">...</span></h3><div class="status" id="status-${id}">กำลังเชื่อมต่อข้อมูล...</div></div>`;
             
-            // ดึงข้อมูลแต่ละจอมาอัปเดต
             onValue(ref(db, 'displays/display_' + id), (snapshot) => {
                 const data = snapshot.val();
                 if(data) {
@@ -51,15 +43,10 @@
             });
         }
 
-        // ระบบตรวจสอบรหัสผ่าน (เก็บค่าลง SessionStorage)
         window.loginToControl = function() {
             const pwd = prompt("กรุณาป้อนรหัสผ่านผู้ดูแลระบบ:");
-            if(pwd === "878556") {
-                sessionStorage.setItem("isAdmin", "true");
-                window.location.href = "control.html";
-            } else if (pwd !== null) {
-                alert("รหัสผ่านไม่ถูกต้อง!");
-            }
+            if(pwd === "878556") { sessionStorage.setItem("isAdmin", "true"); window.location.href = "control.html"; } 
+            else if (pwd !== null) { alert("รหัสผ่านไม่ถูกต้อง!"); }
         }
     </script>
 </body>
