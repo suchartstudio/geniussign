@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <title>Signage Pro Controller</title>
     <style>
-        /* (ใช้ CSS เดิมจากเวอร์ชันก่อนหน้าได้เลย) */
         body { font-family: 'Segoe UI', sans-serif; background: #1e1e1e; color: #fff; margin: 0; display: flex; height: 100vh; overflow: hidden; }
         .sidebar { width: 350px; background: #2d2d2d; padding: 20px; overflow-y: auto; border-right: 1px solid #444; }
         .main-workspace { flex-grow: 1; padding: 20px; display: flex; flex-direction: column; overflow-y: auto; }
@@ -12,26 +11,27 @@
         button, select, input { width: 100%; padding: 8px; margin-top: 10px; background: #3d3d3d; color: white; border: 1px solid #555; border-radius: 4px; cursor: pointer; }
         button.primary { background: #0078D7; font-weight: bold; } button.primary:hover { background: #005A9E; }
         
-        /* สไตล์ใหม่สำหรับ Media Item */
         .media-item { background: #444; padding: 8px; margin-top: 8px; border-radius: 4px; display: flex; align-items: center; gap: 10px; font-size: 12px; }
         .media-thumb { width: 40px; height: 40px; object-fit: cover; background: #000; flex-shrink: 0; cursor: grab; }
         .media-info { flex-grow: 1; overflow: hidden; }
         .media-actions button { width: auto; padding: 4px 8px; margin: 0; font-size: 10px; }
         .btn-del { background: #d32f2f; } .btn-del:hover { background: #b71c1c; }
 
-        /* Canvas และ Zone (ตั้ง Object-fit ให้พอดีกรอบ) */
         .canvas-wrapper { background: #000; position: relative; margin: 20px auto; border: 2px solid #555; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        .zone-box { position: absolute; border: 2px dashed #4CAF50; resize: both; overflow: hidden; display: flex; flex-direction: column; background: #000; }
-        .zone-header { background: #4CAF50; color: #000; width: 100%; font-size: 12px; font-weight: bold; cursor: move; padding: 2px 0; text-align: center; }
-        .zone-content { flex-grow: 1; width: 100%; pointer-events: none; background: #000; }
-        /* ตั้งค่าให้ภาพพอดีกับกรอบ */
-        .zone-content img, .zone-content video { width: 100%; height: 100%; object-fit: contain; }
+        .zone-box { position: absolute; border: 2px dashed #4CAF50; resize: both; overflow: hidden; display: flex; flex-direction: column; background: #111; }
+        .zone-header { background: #4CAF50; color: #000; width: 100%; font-size: 12px; font-weight: bold; cursor: move; padding: 2px 0; text-align: center; position: relative; z-index: 10; }
+        .zone-content { flex-grow: 1; width: 100%; position: relative; pointer-events: none; display: flex; align-items: center; justify-content: center; background: #000; }
+        .zone-content img, .zone-content video { width: 100%; height: 100%; object-fit: contain; position: absolute; top:0; left:0; }
+        
+        /* ป้ายแสดงจำนวนไฟล์และปุ่มลบสื่อใน Zone */
+        .playlist-badge { position: absolute; top: 5px; right: 5px; background: #ff9800; color: #000; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: bold; z-index: 5; }
+        .btn-clear-zone { position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%); background: #d32f2f; color: white; padding: 4px 10px; font-size: 10px; border: none; border-radius: 4px; cursor: pointer; pointer-events: auto; z-index: 5; }
+        .btn-clear-zone:hover { background: #b71c1c; }
 
         .layout-tabs { display: flex; gap: 5px; margin-bottom: 10px; }
         .tab { padding: 8px 15px; background: #333; border-radius: 4px; cursor: pointer; }
         .tab.active { background: #4CAF50; color: #000; font-weight: bold; }
     </style>
-    
     <script>
         if (sessionStorage.getItem('isAdmin') !== 'true') {
             alert('กรุณาเข้าสู่ระบบผ่านหน้าแรก');
@@ -60,23 +60,23 @@
         <button onclick="uploadFile()" class="primary">อัปโหลดไฟล์</button>
         <progress id="upload-progress" value="0" max="100" style="width: 100%; display: none; margin-top: 10px;"></progress>
         
-        <div id="media-list" style="margin-top: 15px;">
-            </div>
+        <div id="media-list" style="margin-top: 15px;"></div>
 
         <button onclick="saveDeploy()" class="primary" style="margin-top: 40px; padding: 15px; background: #4CAF50;">บันทึก & ส่งขึ้นจอ</button>
         <button onclick="logout()" style="background: #333; margin-top:10px;">ออกจากระบบ</button>
     </div>
 
     <div class="main-workspace">
-        <h3>3. จัดการ Layouts (ลากไฟล์รูปจากซ้ายมือ มาใส่ในกรอบได้เลย)</h3>
+        <h3>3. จัดการ Layouts (ลากไฟล์มาใส่ซ้อนกันได้ เพื่อเล่นวนแบบ Playlist)</h3>
         <div class="layout-tabs" id="tabs-container"></div>
         <button onclick="addLayout()" style="width: auto; padding: 5px 15px;">+ เพิ่ม Layout ใหม่</button>
         
         <div style="margin-top: 15px; display: flex; gap: 15px; align-items: center;">
-            <label>เวลาแสดงผล (วินาที):</label>
-            <input type="number" id="layout-duration" value="10" style="width: 100px; margin: 0;" onchange="updateDuration(this.value)">
+            <label>รอบเวลาเปลี่ยน Layout (วินาที):</label>
+            <input type="number" id="layout-duration" value="30" style="width: 100px; margin: 0;" onchange="updateDuration(this.value)">
             <button onclick="addZone()" style="width: auto; margin: 0; background: #ff9800;">+ เพิ่มกรอบ (Zone)</button>
         </div>
+        <small style="color: #888; display: block; margin-top: 5px;">*หากในกรอบมีวิดีโอที่ยาว แนะนำให้ตั้งเวลารอบเปลี่ยน Layout ให้นานขึ้น</small>
 
         <div id="canvas" class="canvas-wrapper" style="width: 800px; height: 450px;"></div>
     </div>
@@ -86,20 +86,16 @@
 
         let currentScreen = '01';
         let orientation = 'landscape';
-        let layouts = [{ id: 'L1', duration: 10, zones: [] }];
+        let layouts = [{ id: 'L1', duration: 30, zones: [] }];
         let activeLayoutIndex = 0;
 
-        window.logout = function() {
-            sessionStorage.removeItem('isAdmin');
-            window.location.href = 'index.html';
-        }
+        window.logout = function() { sessionStorage.removeItem('isAdmin'); window.location.href = 'index.html'; }
 
-        // --- ระบบ Media Library (เชื่อมกับ Database) ---
+        // --- Media Library ---
         onValue(ref(db, 'media_library'), (snapshot) => {
             const mediaData = snapshot.val();
             const list = document.getElementById('media-list');
             list.innerHTML = '';
-            
             if(mediaData) {
                 Object.keys(mediaData).forEach(key => {
                     const file = mediaData[key];
@@ -122,51 +118,33 @@
         window.uploadFile = function() {
             const file = document.getElementById('file-upload').files[0];
             if(!file) return alert('กรุณาเลือกไฟล์ก่อน');
-            
             const storagePath = 'signage_media/' + Date.now() + '_' + file.name;
             const fileRef = storageRef(storage, storagePath);
             const uploadTask = uploadBytesResumable(fileRef, file);
             const progressBar = document.getElementById('upload-progress');
+            
             progressBar.style.display = 'block';
-
             uploadTask.on('state_changed', 
                 (snapshot) => progressBar.value = (snapshot.bytesTransferred / snapshot.totalBytes) * 100, 
                 (error) => alert('อัปโหลดล้มเหลว: ' + error), 
                 () => {
                     getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
                         progressBar.style.display = 'none';
-                        // บันทึกข้อมูลไฟล์ลง Database 
-                        push(ref(db, 'media_library'), {
-                            name: file.name,
-                            url: downloadURL,
-                            type: file.type.startsWith('video') ? 'video' : 'image',
-                            path: storagePath
-                        });
-                        document.getElementById('file-upload').value = ''; // เคลียร์ช่อง
+                        push(ref(db, 'media_library'), { name: file.name, url: downloadURL, type: file.type.startsWith('video') ? 'video' : 'image', path: storagePath });
+                        document.getElementById('file-upload').value = ''; 
                     });
                 }
             );
         }
 
-        window.renameMedia = function(key, oldName) {
-            const newName = prompt("แก้ไขชื่อไฟล์:", oldName);
-            if(newName && newName.trim() !== '') {
-                update(ref(db, 'media_library/' + key), { name: newName });
-            }
-        }
-
+        window.renameMedia = function(key, oldName) { const newName = prompt("แก้ไขชื่อไฟล์:", oldName); if(newName && newName.trim() !== '') update(ref(db, 'media_library/' + key), { name: newName }); }
         window.deleteMedia = async function(key, path) {
-            if(!confirm("คุณต้องการลบไฟล์นี้ออกจากระบบอย่างถาวรหรือไม่? (สื่อที่กำลังแสดงอยู่บนจอจะหายไป)")) return;
-            try {
-                await deleteObject(storageRef(storage, path)); // ลบไฟล์จริงใน Storage
-                await remove(ref(db, 'media_library/' + key)); // ลบชื่อออกจาก Database
-                alert("ลบไฟล์เรียบร้อยแล้ว");
-            } catch (error) {
-                alert("เกิดข้อผิดพลาดในการลบไฟล์: " + error.message);
-            }
+            if(!confirm("ต้องการลบถาวรหรือไม่?")) return;
+            try { await deleteObject(storageRef(storage, path)); await remove(ref(db, 'media_library/' + key)); } 
+            catch (error) { alert("ลบไฟล์ไม่ได้: " + error.message); }
         }
 
-        // --- ระบบ Canvas และ Layout (เหมือนเดิม แต่เพิ่ม render) ---
+        // --- Canvas & Layout Logic ---
         window.loadData = function() {
             currentScreen = document.getElementById('screen-select').value;
             onValue(ref(db, 'displays/display_' + currentScreen), (snapshot) => {
@@ -175,7 +153,7 @@
                     orientation = data.orientation || 'landscape';
                     layouts = data.layouts;
                 } else {
-                    layouts = [{ id: 'L1', duration: 10, zones: [] }];
+                    layouts = [{ id: 'L1', duration: 30, zones: [] }];
                 }
                 document.getElementById('orientation-select').value = orientation;
                 activeLayoutIndex = 0;
@@ -183,7 +161,7 @@
             }, { onlyOnce: true });
         }
 
-        window.addLayout = function() { layouts.push({ id: 'L' + (layouts.length + 1), duration: 10, zones: [] }); activeLayoutIndex = layouts.length - 1; renderTabs(); renderCanvas(); }
+        window.addLayout = function() { layouts.push({ id: 'L' + (layouts.length + 1), duration: 30, zones: [] }); activeLayoutIndex = layouts.length - 1; renderTabs(); renderCanvas(); }
         window.switchLayout = function(index) { activeLayoutIndex = index; renderTabs(); renderCanvas(); }
         window.updateDuration = function(val) { layouts[activeLayoutIndex].duration = Number(val); }
 
@@ -204,7 +182,13 @@
             renderCanvas();
         }
 
-        window.addZone = function() { layouts[activeLayoutIndex].zones.push({ id: Date.now(), top: 10, left: 10, width: 30, height: 30, url: '', type: '' }); renderCanvas(); }
+        // โครงสร้าง Zone แบบใหม่ ใช้ playlist array
+        window.addZone = function() { layouts[activeLayoutIndex].zones.push({ id: Date.now(), top: 10, left: 10, width: 30, height: 30, playlist: [] }); renderCanvas(); }
+
+        window.clearZonePlaylist = function(zoneIndex) {
+            layouts[activeLayoutIndex].zones[zoneIndex].playlist = [];
+            renderCanvas();
+        }
 
         function renderCanvas() {
             const canvas = document.getElementById('canvas');
@@ -212,6 +196,13 @@
             const zones = layouts[activeLayoutIndex].zones || [];
             
             zones.forEach((zone, index) => {
+                // รองรับข้อมูลเก่าที่เป็นแค่ url (อัปเกรดอัตโนมัติ)
+                if (zone.url && !zone.playlist) {
+                    zone.playlist = [{ url: zone.url, type: zone.type }];
+                    delete zone.url; delete zone.type;
+                }
+                if (!zone.playlist) zone.playlist = [];
+
                 const el = document.createElement('div');
                 el.className = 'zone-box';
                 el.style.top = zone.top + '%'; el.style.left = zone.left + '%';
@@ -220,15 +211,22 @@
                 el.ondragover = (e) => e.preventDefault();
                 el.ondrop = (e) => {
                     e.preventDefault();
-                    zone.url = e.dataTransfer.getData('mediaUrl');
-                    zone.type = e.dataTransfer.getData('mediaType');
+                    zone.playlist.push({ 
+                        url: e.dataTransfer.getData('mediaUrl'), 
+                        type: e.dataTransfer.getData('mediaType') 
+                    });
                     renderCanvas();
                 };
 
-                let mediaHtml = `<div style="color:#aaa; font-size:12px; margin-top:20px;">ลากไฟล์มาวาง</div>`;
-                if(zone.url) {
-                    if(zone.type === 'video') mediaHtml = `<video src="${zone.url}" autoplay loop muted></video>`;
-                    else mediaHtml = `<img src="${zone.url}">`;
+                let mediaHtml = `<div style="color:#aaa; font-size:12px; margin-top:20px;">ลากไฟล์มาวางซ้อนกันได้</div>`;
+                
+                if(zone.playlist.length > 0) {
+                    const first = zone.playlist[0]; // แสดงรูปพรีวิวไฟล์แรกที่หน้า Control
+                    const badge = `<div class="playlist-badge">${zone.playlist.length} สื่อ</div>`;
+                    const clearBtn = `<button class="btn-clear-zone" onmousedown="event.stopPropagation(); clearZonePlaylist(${index});">ล้างสื่อ</button>`;
+                    
+                    if(first.type === 'video') mediaHtml = `${badge}<video src="${first.url}" autoplay loop muted></video>${clearBtn}`;
+                    else mediaHtml = `${badge}<img src="${first.url}">${clearBtn}`;
                 }
 
                 el.innerHTML = `
