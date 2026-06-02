@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <title>Signage System Status</title>
-    <!-- เพิ่ม Google Font: Prompt -->
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Prompt', sans-serif; background: #121212; color: #fff; margin: 0; padding: 30px; }
@@ -12,9 +11,19 @@
         .btn-admin:hover { background: #45a049; }
         
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
-        .screen-card { background: #1e1e1e; padding: 20px; border-radius: 8px; border: 1px solid #333; }
-        .screen-card h3 { margin: 0 0 10px 0; color: #4CAF50; display: flex; justify-content: space-between; }
-        .status { color: #888; font-size: 14px; }
+        .screen-card { background: #1e1e1e; padding: 20px; border-radius: 8px; border: 1px solid #333; position: relative; }
+        .screen-card h3 { margin: 0 0 15px 0; color: #4CAF50; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        
+        .info-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
+        .info-label { color: #888; }
+        
+        /* สไตล์สำหรับจุดสถานะ (Online/Offline) */
+        .conn-status { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: bold; margin-top: 15px; padding-top: 10px; border-top: 1px solid #333; }
+        .status-dot { width: 12px; height: 12px; border-radius: 50%; background-color: #555; }
+        .status-dot.online { background-color: #4CAF50; box-shadow: 0 0 8px #4CAF50; }
+        .status-dot.offline { background-color: #d32f2f; }
+        .text-online { color: #4CAF50; }
+        .text-offline { color: #d32f2f; }
     </style>
 </head>
 <body>
@@ -22,6 +31,7 @@
         <h1>ระบบควบคุมจอภาพ (Digital Signage Status)</h1>
         <button class="btn-admin" onclick="loginToControl()">เข้าสู่หน้า Control Panel</button>
     </div>
+    
     <div class="grid" id="status-grid"></div>
 
     <script type="module">
@@ -30,14 +40,50 @@
         const grid = document.getElementById('status-grid');
         for(let i=1; i<=10; i++) {
             let id = i < 10 ? '0'+i : i.toString();
-            grid.innerHTML += `<div class="screen-card" id="card-${id}"><h3>Screen ${id} <span style="font-size: 12px; color:#aaa;" id="ori-${id}">...</span></h3><div class="status" id="status-${id}">กำลังเชื่อมต่อข้อมูล...</div></div>`;
+            grid.innerHTML += `
+                <div class="screen-card" id="card-${id}">
+                    <h3>Screen ${id}</h3>
+                    
+                    <div class="info-row">
+                        <span class="info-label">การวางแนว:</span>
+                        <span id="ori-${id}">...</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">จำนวน Layout:</span>
+                        <span id="status-${id}">...</span>
+                    </div>
+                    
+                    <div class="conn-status">
+                        <div class="status-dot offline" id="dot-${id}"></div>
+                        <span class="text-offline" id="conn-${id}">ออฟไลน์ (อุปกรณ์ปิดอยู่)</span>
+                    </div>
+                </div>
+            `;
             
+            // ดึงข้อมูลและสถานะการเชื่อมต่อ
             onValue(ref(db, 'displays/display_' + id), (snapshot) => {
                 const data = snapshot.val();
+                
+                const dot = document.getElementById(`dot-${id}`);
+                const connText = document.getElementById(`conn-${id}`);
+
+                // เช็คสถานะออนไลน์
+                if(data && data.presence === 'online') {
+                    dot.className = 'status-dot online';
+                    connText.className = 'text-online';
+                    connText.innerText = 'ออนไลน์ (กำลังแสดงผล)';
+                } else {
+                    dot.className = 'status-dot offline';
+                    connText.className = 'text-offline';
+                    connText.innerText = 'ออฟไลน์ (อุปกรณ์ปิดอยู่)';
+                }
+
+                // ข้อมูลทั่วไป
                 if(data) {
                     document.getElementById(`ori-${id}`).innerText = data.orientation === 'landscape' ? 'แนวนอน' : 'แนวตั้ง';
-                    document.getElementById(`status-${id}`).innerText = `มี Layout จำนวน ${data.layouts ? data.layouts.length : 0} รายการ`;
+                    document.getElementById(`status-${id}`).innerText = `${data.layouts ? data.layouts.length : 0} รายการ`;
                 } else {
+                    document.getElementById(`ori-${id}`).innerText = '-';
                     document.getElementById(`status-${id}`).innerText = 'ยังไม่มีการตั้งค่า';
                 }
             });
