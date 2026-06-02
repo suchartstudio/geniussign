@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <title>Digital Signage Player</title>
-    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;700&display=swap" rel="stylesheet">
+    <link id="dynamic-font" href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; background: #000; overflow: hidden; font-family: 'Prompt', sans-serif; }
+        body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; background: #000; overflow: hidden; font-family: 'Prompt', sans-serif; transition: font-family 0.3s; }
         #player-container { position: relative; width: 100%; height: 100%; }
         
         .zone-element { position: absolute; overflow: hidden; background: #000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
@@ -42,6 +42,13 @@
             const data = snapshot.val();
             if(!data || !data.layouts) return;
 
+            // จัดการอัปเดตฟอนต์ตามที่ตั้งค่า
+            if (data.globalFont) {
+                const fontUrl = `https://fonts.googleapis.com/css2?family=${data.globalFont.replace(/ /g, '+')}:wght@300;400;500;700&display=swap`;
+                document.getElementById('dynamic-font').href = fontUrl;
+                document.body.style.fontFamily = `'${data.globalFont}', sans-serif`;
+            }
+
             layouts = data.layouts;
             currentLayoutIndex = 0;
             playCurrentLayout();
@@ -59,17 +66,12 @@
             container.innerHTML = ''; 
 
             const zones = layout.zones || [];
-            
-            // คัดแยกเฉพาะกรอบสื่อ (Media) ที่ต้องรอโหลด
             const mediaZones = zones.filter(z => z.type !== 'clock' && z.playlist && z.playlist.length > 0);
             const totalMediaZones = mediaZones.length;
             let zonesCompletedCount = 0;
             let isLayoutFinished = false;
 
-            // หากไม่มีกรอบสื่อเลย (เช่น หน้าว่าง หรือมีแต่นาฬิกา) ให้รอ 15 วิแล้วเปลี่ยนหน้า
-            if(totalMediaZones === 0) {
-                fallbackTimer = setTimeout(playNextLayout, 15000);
-            }
+            if(totalMediaZones === 0) { fallbackTimer = setTimeout(playNextLayout, 15000); }
 
             function onZoneLoopComplete() {
                 if(isLayoutFinished) return;
@@ -97,9 +99,8 @@
             });
         }
 
-        // ฟังก์ชันสร้างและนับเวลาสำหรับนาฬิกา (ปี พ.ศ.)
         function renderClockZone(zoneDiv) {
-            const clockHtml = `<div class="clock-container"><div class="clock-time" id="time-${zoneDiv.style.top}">00:00:00</div><div class="clock-date" id="date-${zoneDiv.style.top}">วัน เดือน ปี</div></div>`;
+            const clockHtml = `<div class="clock-container"><div class="clock-time">00:00:00</div><div class="clock-date">วัน เดือน ปี</div></div>`;
             zoneDiv.innerHTML = clockHtml;
             
             const timeEl = zoneDiv.querySelector('.clock-time');
@@ -108,7 +109,6 @@
             const updateClock = () => {
                 const now = new Date();
                 timeEl.innerText = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                // ฟอร์แมตวันที่ภาษาไทย แบบเต็ม
                 dateEl.innerText = now.toLocaleDateString('th-TH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
             };
             
