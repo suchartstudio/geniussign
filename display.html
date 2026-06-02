@@ -7,10 +7,14 @@
         body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; background: #000; overflow: hidden; }
         #player-container { position: relative; width: 100%; height: 100%; }
         
-        .zone-element { position: absolute; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #111; }
-        .zone-media { width: 100%; height: 100%; object-fit: cover; }
+        .zone-element { 
+            position: absolute; overflow: hidden; display: flex; align-items: center; justify-content: center; 
+            background: #000; /* พื้นหลังสีดำในกรณีที่ภาพไม่ได้สัดส่วนพอดีกรอบ */
+        }
         
-        /* Transition นุ่มนวลตอนสลับ Layout */
+        /* หัวใจสำคัญ: ทำให้ภาพและวิดีโอ พอดีกับกรอบ (ไม่ตัดขอบ ไม่ยืด) */
+        .zone-media { width: 100%; height: 100%; object-fit: contain; }
+        
         .fade-in { animation: fadeIn 1s; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
@@ -24,7 +28,7 @@
     <script type="module">
         import { db, ref, onValue } from './firebase-config.js';
 
-        // *** กำหนดเลขจอที่ต้องการเปิด ***
+        // *** กำหนดเลขจอที่ต้องการเปิด (01 - 10) ***
         const DISPLAY_ID = '01'; 
         
         const container = document.getElementById('player-container');
@@ -32,41 +36,32 @@
         let currentLayoutIndex = 0;
         let loopTimer = null;
 
-        // รับข้อมูลจาก Firebase
         onValue(ref(db, 'displays/display_' + DISPLAY_ID), (snapshot) => {
             const data = snapshot.val();
             if(!data || !data.layouts) return;
 
             layouts = data.layouts;
             currentLayoutIndex = 0;
-            
-            // เริ่มเล่น Playlist ทันทีที่ข้อมูลมา
             playCurrentLayout();
         });
 
         function playCurrentLayout() {
             if(layouts.length === 0) return;
-
-            // ล้าง Timer เก่าออก
             if(loopTimer) clearTimeout(loopTimer);
 
             const layout = layouts[currentLayoutIndex];
             renderLayout(layout);
-
-            // ตั้งเวลาเพื่อเปลี่ยนไป Layout ถัดไป (คูณ 1000 เพื่อแปลงวินาทีเป็นมิลลิวินาที)
-            const durationMs = (layout.duration || 10) * 1000;
             
+            const durationMs = (layout.duration || 10) * 1000;
             loopTimer = setTimeout(() => {
-                // เลื่อน index ไปอันถัดไป ถ้าหมดแล้วให้กลับไป 0
                 currentLayoutIndex = (currentLayoutIndex + 1) % layouts.length;
                 playCurrentLayout();
             }, durationMs);
         }
 
         function renderLayout(layout) {
-            container.innerHTML = ''; // ล้างจอเก่า
+            container.innerHTML = ''; 
             
-            // วาดกล่อง Zone ทุกอันใน Layout นี้
             const zones = layout.zones || [];
             zones.forEach(zone => {
                 const zoneDiv = document.createElement('div');
@@ -78,7 +73,6 @@
 
                 if(zone.url) {
                     if (zone.type === 'video') {
-                        // ซ่อนปุ่มควบคุม, เล่นอัตโนมัติ, เล่นวน, ปิดเสียง
                         zoneDiv.innerHTML = `<video src="${zone.url}" class="zone-media" autoplay loop muted playsinline></video>`;
                     } else {
                         zoneDiv.innerHTML = `<img src="${zone.url}" class="zone-media">`;
