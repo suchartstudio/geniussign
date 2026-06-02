@@ -11,15 +11,14 @@
             position: absolute; overflow: hidden; background: #000; 
         }
         
-        /* ตั้งค่าซ้อนทับเพื่อทำเอฟเฟกต์เฟดสลับสื่อ */
+        /* สื่อแสดงแบบ Stretch ยืดให้เต็มกรอบ */
         .zone-media { 
             position: absolute; top: 0; left: 0; 
-            width: 100%; height: 100%; object-fit: contain; 
-            opacity: 0; /* ซ่อนไว้เป็นค่าเริ่มต้น */
-            transition: opacity 1s ease-in-out; /* ระยะเวลาเฟด 1 วินาที */
+            width: 100%; height: 100%; object-fit: fill; 
+            opacity: 0;
+            transition: opacity 1s ease-in-out; 
         }
         
-        /* คลาสสำหรับเรียกใช้เฟดภาพเข้า-ออก */
         .zone-media.active { opacity: 1; z-index: 2; }
         .zone-media.fade-out { opacity: 0; z-index: 1; }
     </style>
@@ -39,8 +38,10 @@
         const container = document.getElementById('player-container');
         let layouts = [];
         let currentLayoutIndex = 0;
-        let loopTimer = null;
-        let zoneCleanups = []; // สำหรับจัดการล้าง Timeout ของแต่ละ Zone เมื่อเปลี่ยน Layout
+        let zoneCleanups = []; 
+        
+        // ตัวจับเวลาสำรอง เผื่อ Layout นั้นเป็นหน้าจอว่างๆ จะได้ข้ามได้
+        let fallbackTimer = null; 
 
         onValue(ref(db, 'displays/display_' + DISPLAY_ID), (snapshot) => {
             const data = snapshot.val();
@@ -51,35 +52,75 @@
             playCurrentLayout();
         });
 
-        function playCurrentLayout() {
-            if(layouts.length === 0) return;
-            if(loopTimer) clearTimeout(loopTimer);
-
-            const layout = layouts[currentLayoutIndex];
-            renderLayout(layout);
-            
-            // ใช้เวลา Layout ลูปรวม
-            const durationMs = (layout.duration || 30) * 1000;
-            loopTimer = setTimeout(() => {
-                currentLayoutIndex = (currentLayoutIndex + 1) % layouts.length;
-                playCurrentLayout();
-            }, durationMs);
+        function playNextLayout() {
+            currentLayoutIndex = (currentLayoutIndex + 1) % layouts.length;
+            playCurrentLayout();
         }
 
-        // ฟังก์ชันจัดการ Playlist ภายในแต่ละ Zone
-        function playZonePlaylist(zoneDiv, playlist) {
-            if(!playlist || playlist.length === 0) return () => {};
+        function playCurrentLayout() {
+            if(layouts.length === 0) return;
+            if(fallbackTimer) clearTimeout(fallbackTimer);
             
+            const layout = layouts[currentLayoutIndex];
+            
+            // ล้างหน้าเก่า และ Timers เก่าออกให้หมด
+            zoneCleanups.forEach(cleanupFn => cleanupFn());
+            zoneCleanups = [];
+            container.innerHTML = ''; 
+
+            const zones = layout.zones || [];
+            const totalZones = zones.length;
+            let zonesCompletedCount = 0;
+            let isLayoutFinished = false;
+
+            // หากเป็น Layout ว่างๆ (ไม่มีกรอบเลย) ให้รอ 10 วิแล้วเปลี่ยน
+            if(totalZones === 0) {
+                fallbackTimer = setTimeout(playNextLayout, 10000);
+                return;
+            }
+
+            // ฟังก์ชันรับสัญญาณเมื่อ Zone ใดๆ เล่นครบ 1 รอบแล้ว
+            function onZoneLoopComplete() {
+                if(isLayoutFinished) return;
+                
+                zonesCompletedCount++;
+                // ถ้ายอดรวม Zone ที่เล่นจบ เท่ากับ Zone ทั้งหมดในหน้าจอ = อนุญาตให้เปลี่ยน Layout ได้
+                if(zonesCompletedCount >= totalZones) {
+                    isLayoutFinished = true;
+                    playNextLayout();
+                }
+            }
+
+            zones.forEach(zone => {
+                const zoneDiv = document.createElement('div');
+                zoneDiv.className = 'zone-element';
+                zoneDiv.style.top = zone.top + '%';
+                zoneDiv.style.left = zone.left + '%';
+                zoneDiv.style.width = zone.width + '%';
+                zoneDiv.style.height = zone.height + '%';
+                container.appendChild(zoneDiv);
+
+                if (zone.playlist && zone.playlist.length > 0) {
+                    // ส่ง Callback ไปให้ Zone เพื่อแจ้งเตือนตอนเล่นครบ Loop
+                    const cleanup = playZonePlaylist(zoneDiv, zone.playlist, onZoneLoopComplete);
+                    zoneCleanups.push(cleanup);
+                } else {
+                    // ถ้ากรอบนี้ไม่มีสื่อ ให้ถือว่าเล่นจบแล้วทันที
+                    onZoneLoopComplete();
+                }
+            });
+        }
+
+        function playZonePlaylist(zoneDiv, playlist, onLoopComplete) {
             let currentIndex = 0;
             let currentElement = null;
             let zoneTimer = null;
 
             function showNextMedia() {
-                // ถ้ามีสื่อเก่ากำลังแสดง ให้ค่อยๆ เฟดออก (1 วิ) แล้วลบทิ้ง
                 if (currentElement) {
                     currentElement.classList.remove('active');
                     currentElement.classList.add('fade-out');
-                    setTimeout((el) => { if(el.parentNode) el.parentNode.removeChild(el); }, 1000, currentElement);
+                    setTimeout((el) => { if(el && el.parentNode) el.parentNode.removeChild(el); }, 1000, currentElement);
                 }
 
                 const item = playlist[currentIndex];
@@ -93,75 +134,38 @@
                     nextElement.muted = true;
                     nextElement.playsInline = true;
                     
-                    // เมื่อวิดีโอเล่นจบ ให้สลับไปไฟล์ถัดไปทันที
-                    nextElement.onended = () => {
-                        currentIndex = (currentIndex + 1) % playlist.length;
-                        showNextMedia();
-                    };
-                    
-                    // กันเหนียวกรณีโหลดวิดีโอไม่ขึ้น ให้ข้ามไปภาพต่อไป
-                    nextElement.onerror = () => {
-                        currentIndex = (currentIndex + 1) % playlist.length;
-                        zoneTimer = setTimeout(showNextMedia, 1000);
-                    };
+                    nextElement.onended = proceedToNext;
+                    nextElement.onerror = () => { zoneTimer = setTimeout(proceedToNext, 1000); };
                 } else {
-                    // หากเป็นภาพนิ่ง
                     nextElement = document.createElement('img');
                     nextElement.src = item.url;
                     nextElement.className = 'zone-media';
                     
-                    // ตั้งเวลาหน่วง 8 วินาที (8000ms) แล้วเปลี่ยนภาพ
-                    zoneTimer = setTimeout(() => {
-                        currentIndex = (currentIndex + 1) % playlist.length;
-                        showNextMedia();
-                    }, 8000);
+                    // ภาพนิ่งแสดง 8 วินาที
+                    zoneTimer = setTimeout(proceedToNext, 8000);
                 }
 
                 zoneDiv.appendChild(nextElement);
-                
-                // ใช้ Timeout เล็กน้อยเพื่อให้ CSS Transition เฟดเข้า (Fade-in) ทำงาน
                 setTimeout(() => { nextElement.classList.add('active'); }, 50);
-                
                 currentElement = nextElement;
             }
 
-            // เริ่มเล่นไฟล์แรก
+            // ฟังก์ชันจัดการการเลื่อนไปไฟล์ถัดไป และเช็ครอบ (Loop)
+            function proceedToNext() {
+                currentIndex++;
+                // ถ้าไฟล์หมดแล้ว (ครบ 1 รอบของกรอบนี้)
+                if (currentIndex >= playlist.length) {
+                    currentIndex = 0;
+                    onLoopComplete(); // แจ้งเตือน Layout ตัวแม่ว่า "กรอบฉันเล่นจบแล้วนะ"
+                }
+                showNextMedia();
+            }
+
             showNextMedia();
 
-            // ส่งฟังก์ชัน Cleanup คืนกลับไป เพื่อให้ระบบล้างเวลาออกเมื่อต้องสลับหน้า Layout ใหญ่
             return () => {
                 if(zoneTimer) clearTimeout(zoneTimer);
             };
-        }
-
-        function renderLayout(layout) {
-            // ล้างรอบการเล่น (Timeouts) ของ Zone เก่าๆ ก่อนเปลี่ยนหน้า
-            zoneCleanups.forEach(cleanupFn => cleanupFn());
-            zoneCleanups = [];
-            container.innerHTML = ''; 
-            
-            const zones = layout.zones || [];
-            zones.forEach(zone => {
-                // แปลงข้อมูลเก่า (ถ้ามี) ให้เป็นรูปแบบ Playlist
-                if(zone.url && !zone.playlist) {
-                    zone.playlist = [{ url: zone.url, type: zone.type }];
-                }
-
-                const zoneDiv = document.createElement('div');
-                zoneDiv.className = 'zone-element';
-                zoneDiv.style.top = zone.top + '%';
-                zoneDiv.style.left = zone.left + '%';
-                zoneDiv.style.width = zone.width + '%';
-                zoneDiv.style.height = zone.height + '%';
-                
-                container.appendChild(zoneDiv);
-
-                // เริ่มกระบวนการเล่นสลับไฟล์ใน Zone นี้
-                if (zone.playlist && zone.playlist.length > 0) {
-                    const cleanup = playZonePlaylist(zoneDiv, zone.playlist);
-                    zoneCleanups.push(cleanup);
-                }
-            });
         }
     </script>
 </body>
