@@ -6,13 +6,18 @@
     <link id="dynamic-font" href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Prompt', sans-serif; background: #1e1e1e; color: #fff; margin: 0; display: flex; height: 100vh; overflow: hidden; transition: font-family 0.3s; }
-        .sidebar { width: 350px; background: #2d2d2d; padding: 20px; overflow-y: auto; border-right: 1px solid #444; flex-shrink: 0; }
-        .main-workspace { flex-grow: 1; padding: 20px; display: flex; flex-direction: column; overflow-y: auto; }
+        
+        /* แบ่งหน้าจอเป็น 3 ส่วน: ซ้าย (ตั้งค่า) - กลาง (ออกแบบ) - ขวา (คลังสื่อ) */
+        .sidebar-left { width: 280px; background: #2d2d2d; padding: 20px; overflow-y: auto; border-right: 1px solid #444; flex-shrink: 0; }
+        .main-workspace { flex-grow: 1; padding: 20px; display: flex; flex-direction: column; overflow-y: auto; background: #1a1a1a; }
+        .sidebar-right { width: 320px; background: #2d2d2d; padding: 20px; overflow-y: auto; border-left: 1px solid #444; flex-shrink: 0; }
+        
         h3 { color: #4CAF50; margin-top: 0; border-bottom: 1px solid #444; padding-bottom: 10px; }
-        label { display: block; margin-top: 10px; font-size: 14px; color: #aaa; }
+        label { display: block; margin-top: 15px; font-size: 14px; color: #aaa; }
         button, select, input { font-family: inherit; width: 100%; padding: 8px; margin-top: 5px; background: #3d3d3d; color: white; border: 1px solid #555; border-radius: 4px; cursor: pointer; }
         button.primary { background: #0078D7; font-weight: bold; } button.primary:hover { background: #005A9E; }
         
+        /* สไตล์คลังสื่อด้านขวา */
         .media-item { background: #444; padding: 8px; margin-top: 8px; border-radius: 4px; display: flex; align-items: center; gap: 10px; font-size: 12px; }
         .media-thumb { width: 40px; height: 40px; object-fit: cover; background: #000; flex-shrink: 0; cursor: grab; }
         .media-info { flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -42,16 +47,18 @@
 </head>
 <body>
 
-    <div class="sidebar">
-        <h3>1. ตั้งค่าหน้าจอทั่วไป</h3>
+    <div class="sidebar-left">
+        <h3>1. ตั้งค่าหน้าจอ</h3>
         <label>เลือกจอภาพ:</label>
         <select id="screen-select" onchange="loadData()">
             <option value="01">Screen 01</option> <option value="02">Screen 02</option>
             <option value="03">Screen 03</option> <option value="04">Screen 04</option>
             <option value="05">Screen 05</option> <option value="06">Screen 06</option>
+            <option value="07">Screen 07</option> <option value="08">Screen 08</option>
+            <option value="09">Screen 09</option> <option value="10">Screen 10</option>
         </select>
         
-        <label>การวางแนว:</label>
+        <label>การวางแนว (อิสระตามจอ):</label>
         <select id="orientation-select" onchange="updateCanvas()">
             <option value="landscape">แนวนอน (16:9)</option>
             <option value="portrait">แนวตั้ง (9:16)</option>
@@ -68,19 +75,12 @@
             <option value="Sriracha">Sriracha (ศรีราชา)</option>
         </select>
 
-        <h3 style="margin-top: 30px;">2. คลังสื่อ (Media Library)</h3>
-        <input type="file" id="file-upload" accept="image/*,video/*">
-        <button onclick="uploadFile()" class="primary">อัปโหลดไฟล์</button>
-        <progress id="upload-progress" value="0" max="100" style="width: 100%; display: none; margin-top: 10px;"></progress>
-        
-        <div id="media-list" style="margin-top: 15px; max-height: 400px; overflow-y: auto;"></div>
-
         <button onclick="saveDeploy()" class="primary" style="margin-top: 40px; padding: 15px; background: #4CAF50; font-size:16px;">บันทึก & ส่งขึ้นจอ</button>
         <button onclick="logout()" style="background: #333; margin-top:10px;">ออกจากระบบ</button>
     </div>
 
     <div class="main-workspace">
-        <h3>3. จัดการ Layouts</h3>
+        <h3>2. จัดการ Layouts</h3>
         <div class="layout-tabs" id="tabs-container"></div>
         <button onclick="addLayout()" style="width: auto; padding: 5px 15px;">+ เพิ่ม Layout ใหม่</button>
         
@@ -90,6 +90,15 @@
         </div>
 
         <div id="canvas" class="canvas-wrapper" style="width: 800px; height: 450px;"></div>
+    </div>
+
+    <div class="sidebar-right">
+        <h3>3. คลังสื่อ (Media Library)</h3>
+        <input type="file" id="file-upload" accept="image/*,video/*">
+        <button onclick="uploadFile()" class="primary">อัปโหลดไฟล์</button>
+        <progress id="upload-progress" value="0" max="100" style="width: 100%; display: none; margin-top: 10px;"></progress>
+        
+        <div id="media-list" style="margin-top: 15px; overflow-y: auto;"></div>
     </div>
 
     <script type="module">
@@ -111,7 +120,7 @@
             document.body.style.fontFamily = `'${globalFont}', sans-serif`;
         }
 
-        // --- ระบบคลังสื่อ ---
+        // --- ระบบคลังสื่อ (ด้านขวา) ---
         onValue(ref(db, 'media_library'), (snapshot) => {
             const mediaData = snapshot.val();
             const list = document.getElementById('media-list');
@@ -166,12 +175,18 @@
                     globalFont = data.globalFont || 'Prompt';
                 } else { 
                     layouts = [{ id: 'L1', zones: [] }]; 
+                    orientation = 'landscape';
                     globalFont = 'Prompt';
                 }
+                
                 document.getElementById('orientation-select').value = orientation; 
                 document.getElementById('font-select').value = globalFont;
                 window.changeGlobalFont();
-                activeLayoutIndex = 0; renderTabs(); renderCanvas();
+                activeLayoutIndex = 0; 
+                renderTabs(); 
+                
+                // อัปเดตขนาดพรีวิว Canvas ทันทีที่โหลดข้อมูลจอเสร็จ
+                window.updateCanvas();
             }, { onlyOnce: true });
         }
 
@@ -226,7 +241,6 @@
                         bgPreview = first.type === 'video' ? `<video src="${first.url}" autoplay loop muted></video>` : `<img src="${first.url}">`;
                     }
                     
-                    // แก้ไขบั๊กการดัก Event ไม่ให้ทะลุไปโดนฟังก์ชัน Drag โดยใช้ onmousedown="event.stopPropagation(); ..."
                     let playlistHtml = zone.playlist.map((item, i) => `
                         <div class="zone-media-list-item">
                             <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${item.type==='video'?'🎥':'🖼️'} ${item.name}</span>
@@ -244,7 +258,6 @@
                     innerContent = `<div class="clock-preview">12:30:00<br><span style="font-size:12px;">วันพุธที่ 3 มิถุนายน 2569</span></div>`;
                 }
 
-                // แก้ไขบั๊กการดัก Event ให้ปุ่มลบโซน
                 el.innerHTML = `
                     <div class="zone-header" onmousedown="startDrag(event, ${index})">
                         <span>${zone.type === 'clock' ? '⏱️ นาฬิกา' : '🖼️ กรอบสื่อ'}</span>
@@ -290,7 +303,7 @@
 
         window.saveDeploy = function() {
             set(ref(db, 'displays/display_' + currentScreen), { orientation: orientation, globalFont: globalFont, layouts: layouts })
-                .then(() => alert(`ส่งข้อมูลขึ้น ${currentScreen} สำเร็จ!`));
+                .then(() => alert(`บันทึกและส่งข้อมูลขึ้น ${currentScreen} สำเร็จ!`));
         }
 
         window.onload = loadData;
