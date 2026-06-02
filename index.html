@@ -10,15 +10,20 @@
         .btn-admin { background: #4CAF50; color: #000; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 16px; font-family: 'Prompt', sans-serif; }
         .btn-admin:hover { background: #45a049; }
         
-        /* สไตล์ป้ายเตือนฉุกเฉิน */
         #emergency-banner { display: none; background: #d32f2f; color: white; padding: 15px; text-align: center; font-weight: bold; font-size: 20px; border-radius: 8px; margin-bottom: 30px; animation: blink 2s infinite; }
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.8; } 100% { opacity: 1; } }
         
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
         .screen-card { background: #1e1e1e; padding: 20px; border-radius: 8px; border: 1px solid #333; position: relative; }
         .screen-card h3 { margin: 0 0 15px 0; color: #4CAF50; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        
         .info-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
         .info-label { color: #888; }
+        
+        /* สไตล์ปุ่มเปิดหน้าจอ */
+        .btn-view { background: #0078D7; color: #fff; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; margin-top: 15px; width: 100%; font-family: 'Prompt', sans-serif; }
+        .btn-view:hover { background: #005A9E; }
+        
         .conn-status { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: bold; margin-top: 15px; padding-top: 10px; border-top: 1px solid #333; }
         .status-dot { width: 12px; height: 12px; border-radius: 50%; background-color: #555; }
         .status-dot.online { background-color: #4CAF50; box-shadow: 0 0 8px #4CAF50; }
@@ -54,7 +59,10 @@
                     <h3>Screen ${id}</h3>
                     <div class="info-row"><span class="info-label">การวางแนว:</span><span id="ori-${id}">...</span></div>
                     <div class="info-row"><span class="info-label">จำนวน Layout:</span><span id="status-${id}">...</span></div>
-                    <div class="conn-status"><div class="status-dot offline" id="dot-${id}"></div><span class="text-offline" id="conn-${id}">ออฟไลน์ (อุปกรณ์ปิดอยู่)</span></div>
+                    
+                    <button class="btn-view" onclick="window.open('display.html?screen=${id}', '_blank')">เปิดหน้าจอแสดงผล</button>
+                    
+                    <div class="conn-status"><div class="status-dot offline" id="dot-${id}"></div><span class="text-offline" id="conn-${id}">ออฟไลน์</span></div>
                 </div>
             `;
             
@@ -64,9 +72,9 @@
                 const connText = document.getElementById(`conn-${id}`);
 
                 if(data && data.presence === 'online') {
-                    dot.className = 'status-dot online'; connText.className = 'text-online'; connText.innerText = 'ออนไลน์ (กำลังแสดงผล)';
+                    dot.className = 'status-dot online'; connText.className = 'text-online'; connText.innerText = 'ออนไลน์';
                 } else {
-                    dot.className = 'status-dot offline'; connText.className = 'text-offline'; connText.innerText = 'ออฟไลน์ (อุปกรณ์ปิดอยู่)';
+                    dot.className = 'status-dot offline'; connText.className = 'text-offline'; connText.innerText = 'ออฟไลน์';
                 }
 
                 if(data) {
@@ -74,7 +82,7 @@
                     document.getElementById(`status-${id}`).innerText = `${data.layouts ? data.layouts.length : 0} รายการ`;
                 } else {
                     document.getElementById(`ori-${id}`).innerText = '-';
-                    document.getElementById(`status-${id}`).innerText = 'ยังไม่มีการตั้งค่า';
+                    document.getElementById(`status-${id}`).innerText = 'ยังไม่มีข้อมูล';
                 }
             });
         }
