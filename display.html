@@ -3,30 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <title>Digital Signage Player</title>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; background: #000; overflow: hidden; }
+        body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; background: #000; overflow: hidden; font-family: 'Prompt', sans-serif; }
         #player-container { position: relative; width: 100%; height: 100%; }
         
-        .zone-element { 
-            position: absolute; overflow: hidden; background: #000; 
-        }
+        .zone-element { position: absolute; overflow: hidden; background: #000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
         
-        /* สื่อแสดงแบบ Stretch ยืดให้เต็มกรอบ */
-        .zone-media { 
-            position: absolute; top: 0; left: 0; 
-            width: 100%; height: 100%; object-fit: fill; 
-            opacity: 0;
-            transition: opacity 1s ease-in-out; 
-        }
-        
+        .zone-media { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: fill; opacity: 0; transition: opacity 1s ease-in-out; }
         .zone-media.active { opacity: 1; z-index: 2; }
         .zone-media.fade-out { opacity: 0; z-index: 1; }
+        
+        /* สไตล์สำหรับ Widget นาฬิกา */
+        .clock-container { width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #0a0a0a; color: #fff; z-index: 5; text-align: center; }
+        .clock-time { font-size: 15vh; font-weight: 700; line-height: 1; margin-bottom: 2vh; text-shadow: 0 0 20px rgba(0, 188, 212, 0.5); color: #00bcd4; }
+        .clock-date { font-size: 5vh; font-weight: 400; color: #ccc; }
     </style>
 </head>
 <body>
 
     <div id="player-container">
-        <h1 style="color:#555; text-align:center; padding-top: 40vh; font-family: sans-serif;">Connecting to Firebase...</h1>
+        <h1 style="color:#555; text-align:center; padding-top: 40vh;">Connecting to Firebase...</h1>
     </div>
 
     <script type="module">
@@ -39,8 +36,6 @@
         let layouts = [];
         let currentLayoutIndex = 0;
         let zoneCleanups = []; 
-        
-        // ตัวจับเวลาสำรอง เผื่อ Layout นั้นเป็นหน้าจอว่างๆ จะได้ข้ามได้
         let fallbackTimer = null; 
 
         onValue(ref(db, 'displays/display_' + DISPLAY_ID), (snapshot) => {
@@ -52,40 +47,34 @@
             playCurrentLayout();
         });
 
-        function playNextLayout() {
-            currentLayoutIndex = (currentLayoutIndex + 1) % layouts.length;
-            playCurrentLayout();
-        }
+        function playNextLayout() { currentLayoutIndex = (currentLayoutIndex + 1) % layouts.length; playCurrentLayout(); }
 
         function playCurrentLayout() {
             if(layouts.length === 0) return;
             if(fallbackTimer) clearTimeout(fallbackTimer);
             
             const layout = layouts[currentLayoutIndex];
-            
-            // ล้างหน้าเก่า และ Timers เก่าออกให้หมด
             zoneCleanups.forEach(cleanupFn => cleanupFn());
             zoneCleanups = [];
             container.innerHTML = ''; 
 
             const zones = layout.zones || [];
-            const totalZones = zones.length;
+            
+            // คัดแยกเฉพาะกรอบสื่อ (Media) ที่ต้องรอโหลด
+            const mediaZones = zones.filter(z => z.type !== 'clock' && z.playlist && z.playlist.length > 0);
+            const totalMediaZones = mediaZones.length;
             let zonesCompletedCount = 0;
             let isLayoutFinished = false;
 
-            // หากเป็น Layout ว่างๆ (ไม่มีกรอบเลย) ให้รอ 10 วิแล้วเปลี่ยน
-            if(totalZones === 0) {
-                fallbackTimer = setTimeout(playNextLayout, 10000);
-                return;
+            // หากไม่มีกรอบสื่อเลย (เช่น หน้าว่าง หรือมีแต่นาฬิกา) ให้รอ 15 วิแล้วเปลี่ยนหน้า
+            if(totalMediaZones === 0) {
+                fallbackTimer = setTimeout(playNextLayout, 15000);
             }
 
-            // ฟังก์ชันรับสัญญาณเมื่อ Zone ใดๆ เล่นครบ 1 รอบแล้ว
             function onZoneLoopComplete() {
                 if(isLayoutFinished) return;
-                
                 zonesCompletedCount++;
-                // ถ้ายอดรวม Zone ที่เล่นจบ เท่ากับ Zone ทั้งหมดในหน้าจอ = อนุญาตให้เปลี่ยน Layout ได้
-                if(zonesCompletedCount >= totalZones) {
+                if(zonesCompletedCount >= totalMediaZones && totalMediaZones > 0) {
                     isLayoutFinished = true;
                     playNextLayout();
                 }
@@ -94,32 +83,46 @@
             zones.forEach(zone => {
                 const zoneDiv = document.createElement('div');
                 zoneDiv.className = 'zone-element';
-                zoneDiv.style.top = zone.top + '%';
-                zoneDiv.style.left = zone.left + '%';
-                zoneDiv.style.width = zone.width + '%';
-                zoneDiv.style.height = zone.height + '%';
+                zoneDiv.style.top = zone.top + '%'; zoneDiv.style.left = zone.left + '%';
+                zoneDiv.style.width = zone.width + '%'; zoneDiv.style.height = zone.height + '%';
                 container.appendChild(zoneDiv);
 
-                if (zone.playlist && zone.playlist.length > 0) {
-                    // ส่ง Callback ไปให้ Zone เพื่อแจ้งเตือนตอนเล่นครบ Loop
+                if (zone.type === 'clock') {
+                    const cleanup = renderClockZone(zoneDiv);
+                    zoneCleanups.push(cleanup);
+                } else if (zone.playlist && zone.playlist.length > 0) {
                     const cleanup = playZonePlaylist(zoneDiv, zone.playlist, onZoneLoopComplete);
                     zoneCleanups.push(cleanup);
-                } else {
-                    // ถ้ากรอบนี้ไม่มีสื่อ ให้ถือว่าเล่นจบแล้วทันที
-                    onZoneLoopComplete();
                 }
             });
         }
 
+        // ฟังก์ชันสร้างและนับเวลาสำหรับนาฬิกา (ปี พ.ศ.)
+        function renderClockZone(zoneDiv) {
+            const clockHtml = `<div class="clock-container"><div class="clock-time" id="time-${zoneDiv.style.top}">00:00:00</div><div class="clock-date" id="date-${zoneDiv.style.top}">วัน เดือน ปี</div></div>`;
+            zoneDiv.innerHTML = clockHtml;
+            
+            const timeEl = zoneDiv.querySelector('.clock-time');
+            const dateEl = zoneDiv.querySelector('.clock-date');
+            
+            const updateClock = () => {
+                const now = new Date();
+                timeEl.innerText = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                // ฟอร์แมตวันที่ภาษาไทย แบบเต็ม
+                dateEl.innerText = now.toLocaleDateString('th-TH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            };
+            
+            updateClock();
+            const timer = setInterval(updateClock, 1000);
+            return () => clearInterval(timer);
+        }
+
         function playZonePlaylist(zoneDiv, playlist, onLoopComplete) {
-            let currentIndex = 0;
-            let currentElement = null;
-            let zoneTimer = null;
+            let currentIndex = 0; let currentElement = null; let zoneTimer = null;
 
             function showNextMedia() {
                 if (currentElement) {
-                    currentElement.classList.remove('active');
-                    currentElement.classList.add('fade-out');
+                    currentElement.classList.remove('active'); currentElement.classList.add('fade-out');
                     setTimeout((el) => { if(el && el.parentNode) el.parentNode.removeChild(el); }, 1000, currentElement);
                 }
 
@@ -128,20 +131,13 @@
 
                 if (item.type === 'video') {
                     nextElement = document.createElement('video');
-                    nextElement.src = item.url;
-                    nextElement.className = 'zone-media';
-                    nextElement.autoplay = true;
-                    nextElement.muted = true;
-                    nextElement.playsInline = true;
-                    
+                    nextElement.src = item.url; nextElement.className = 'zone-media';
+                    nextElement.autoplay = true; nextElement.muted = true; nextElement.playsInline = true;
                     nextElement.onended = proceedToNext;
                     nextElement.onerror = () => { zoneTimer = setTimeout(proceedToNext, 1000); };
                 } else {
                     nextElement = document.createElement('img');
-                    nextElement.src = item.url;
-                    nextElement.className = 'zone-media';
-                    
-                    // ภาพนิ่งแสดง 8 วินาที
+                    nextElement.src = item.url; nextElement.className = 'zone-media';
                     zoneTimer = setTimeout(proceedToNext, 8000);
                 }
 
@@ -150,22 +146,14 @@
                 currentElement = nextElement;
             }
 
-            // ฟังก์ชันจัดการการเลื่อนไปไฟล์ถัดไป และเช็ครอบ (Loop)
             function proceedToNext() {
                 currentIndex++;
-                // ถ้าไฟล์หมดแล้ว (ครบ 1 รอบของกรอบนี้)
-                if (currentIndex >= playlist.length) {
-                    currentIndex = 0;
-                    onLoopComplete(); // แจ้งเตือน Layout ตัวแม่ว่า "กรอบฉันเล่นจบแล้วนะ"
-                }
+                if (currentIndex >= playlist.length) { currentIndex = 0; onLoopComplete(); }
                 showNextMedia();
             }
 
             showNextMedia();
-
-            return () => {
-                if(zoneTimer) clearTimeout(zoneTimer);
-            };
+            return () => { if(zoneTimer) clearTimeout(zoneTimer); };
         }
     </script>
 </body>
