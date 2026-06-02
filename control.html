@@ -3,128 +3,218 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Signage Control Panel</title>
+    <title>Signage Layout Controller</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1e1e1e; color: #fff; margin: 0; padding: 20px; }
-        h2 { text-align: center; color: #4CAF50; }
-        .grid-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: #1e1e1e; color: #fff; margin: 0; padding: 20px; display: flex; gap: 20px; }
+        .panel { background-color: #2d2d2d; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .sidebar { width: 350px; flex-shrink: 0; }
+        .main-editor { flex-grow: 1; }
         
-        /* Slot-style Dashboard */
-        .slot-card {
-            background-color: #2d2d2d;
-            border-radius: 8px;
-            padding: 15px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-        }
+        h2, h3 { color: #4CAF50; margin-top: 0; }
+        label { display: block; margin-top: 10px; font-size: 14px; color: #aaa; }
+        select, input, button { width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; border: 1px solid #555; background-color: #1e1e1e; color: #fff; box-sizing: border-box; }
         
-        /* ป้ายชื่อจอภาพ ออกแบบให้สะอาดตา ไม่มีเส้นขอบหรือเส้นคาดสีเหลือง */
-        .slot-name {
-            background-color: #3d3d3d;
-            padding: 8px 12px;
-            font-size: 1.2em;
-            font-weight: bold;
-            border-radius: 4px;
-            margin-bottom: 15px;
-            border: none; 
-            outline: none;
-            display: flex;
-            justify-content: space-between;
-        }
-
-        .status-dot { width: 12px; height: 12px; background-color: #4CAF50; border-radius: 50%; display: inline-block; }
-        .control-group { margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
-        
-        button {
-            background-color: #0078D7; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; transition: 0.2s;
-        }
+        button { background-color: #0078D7; border: none; cursor: pointer; font-weight: bold; margin-top: 15px; }
         button:hover { background-color: #005A9E; }
-        button.off { background-color: #d32f2f; }
-        button.off:hover { background-color: #9a0007; }
+        button.danger { background-color: #d32f2f; }
+        button.danger:hover { background-color: #9a0007; }
+
+        /* กล่องตั้งค่า Zone */
+        .zone-card { background-color: #3d3d3d; padding: 15px; border-radius: 6px; margin-top: 15px; }
+        .zone-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         
-        input[type="text"] {
-            width: 60%; padding: 8px; border-radius: 4px; border: 1px solid #555; background-color: #1e1e1e; color: #fff;
+        /* พื้นที่ Preview */
+        .preview-container { 
+            background-color: #000; position: relative; margin: 20px auto; border: 2px solid #555;
+            transition: all 0.3s ease; overflow: hidden;
+        }
+        .preview-zone { 
+            position: absolute; border: 1px solid rgba(255,255,255,0.5); 
+            background-color: rgba(76, 175, 80, 0.2); display: flex; justify-content: center; align-items: center; text-align: center; font-size: 12px; color: #fff;
         }
     </style>
 </head>
 <body>
 
-    <h2>Control Panel - Digital Signage</h2>
-    
-    <div class="grid-container" id="control-grid">
-        <div class="slot-card">
-            <div class="slot-name">
-                Screen 01
-                <span class="status-dot" id="status-01"></span>
-            </div>
-            
-            <div class="control-group">
-                <span>AI People Counter:</span>
-                <button id="btn-ai-01" onclick="toggleFeature('01', 'aiCounter')">เปิด</button>
-            </div>
-            <div class="control-group">
-                <span>ยอดคนเดินผ่าน:</span>
-                <strong id="count-01">0</strong> คน
-            </div>
+    <div class="panel sidebar">
+        <h2>Control Panel</h2>
+        <label>เลือกจอภาพ (Screen):</label>
+        <select id="screen-select" onchange="loadScreenData()">
+            <option value="01">Screen 01</option>
+            <option value="02">Screen 02</option>
+            <option value="03">Screen 03</option>
+            <option value="04">Screen 04</option>
+            <option value="05">Screen 05</option>
+            <option value="06">Screen 06</option>
+            <option value="07">Screen 07</option>
+            <option value="08">Screen 08</option>
+            <option value="09">Screen 09</option>
+            <option value="10">Screen 10</option>
+        </select>
 
-            <hr style="border-color: #444; margin: 15px 0;">
+        <label>การวางแนวจอ (Orientation):</label>
+        <select id="orientation-select" onchange="updatePreview()">
+            <option value="landscape">แนวนอน (Landscape - 16:9)</option>
+            <option value="portrait">แนวตั้ง (Portrait - 9:16)</option>
+        </select>
 
-            <div class="control-group">
-                <span>ตัววิ่ง (Marquee):</span>
-                <button id="btn-mq-01" onclick="toggleFeature('01', 'marquee')">เปิด</button>
+        <button onclick="addZone()" style="background-color: #4CAF50;">+ เพิ่มกรอบ (Add Zone)</button>
+        <button onclick="saveToFirebase()" style="padding: 12px; font-size: 16px;">บันทึกและส่งขึ้นจอ (Deploy)</button>
+    </div>
+
+    <div class="panel main-editor">
+        <h3>Layout Builder</h3>
+        
+        <div id="preview-box" class="preview-container" style="width: 640px; height: 360px;"></div>
+
+        <div id="zones-container">
             </div>
-            <div class="control-group">
-                <input type="text" id="text-mq-01" placeholder="พิมพ์ข้อความตัววิ่ง...">
-                <button onclick="updateMarqueeText('01')">ส่งข้อความ</button>
-            </div>
-        </div>
-        </div>
+    </div>
 
     <script type="module">
-        import { db, ref, onValue, update } from './firebase-config.js';
+        import { db, ref, set, onValue } from './firebase-config.js';
 
-        // ฟังก์ชันรับการเปลี่ยนแปลงจาก Firebase มาแสดงบน Control
-        function listenToDisplay(displayId) {
-            const displayRef = ref(db, 'displays/display_' + displayId);
+        let currentZones = [];
+
+        // ทำให้ฟังก์ชันเป็น Global เพื่อให้ปุ่ม HTML เรียกใช้ได้
+        window.loadScreenData = loadScreenData;
+        window.addZone = addZone;
+        window.removeZone = removeZone;
+        window.updatePreview = updatePreview;
+        window.saveToFirebase = saveToFirebase;
+
+        function loadScreenData() {
+            const screenId = document.getElementById('screen-select').value;
+            const displayRef = ref(db, 'displays/display_' + screenId);
+            
+            // ดึงข้อมูลครั้งเดียวเพื่อมาแก้ไข
             onValue(displayRef, (snapshot) => {
                 const data = snapshot.val();
-                if(data) {
-                    // อัปเดตปุ่ม AI
-                    const aiBtn = document.getElementById(`btn-ai-${displayId}`);
-                    aiBtn.textContent = data.aiCounter.enabled ? "ปิด" : "เปิด";
-                    aiBtn.className = data.aiCounter.enabled ? "" : "off";
-                    document.getElementById(`count-${displayId}`).innerText = data.aiCounter.currentCount;
-
-                    // อัปเดตปุ่ม Marquee
-                    const mqBtn = document.getElementById(`btn-mq-${displayId}`);
-                    mqBtn.textContent = data.marquee.enabled ? "ปิด" : "เปิด";
-                    mqBtn.className = data.marquee.enabled ? "" : "off";
+                if (data) {
+                    document.getElementById('orientation-select').value = data.orientation || 'landscape';
+                    currentZones = data.zones || [];
+                } else {
+                    // ค่าเริ่มต้นถ้ายังไม่มีข้อมูล
+                    document.getElementById('orientation-select').value = 'landscape';
+                    currentZones = [];
                 }
-            });
-        }
-
-        // ทำให้ใช้งานฟังก์ชันใน HTML แบบ onclick ได้
-        window.toggleFeature = function(displayId, feature) {
-            const featurePath = feature === 'aiCounter' ? 'aiCounter/enabled' : 'marquee/enabled';
-            const stateRef = ref(db, `displays/display_${displayId}/${feature}/enabled`);
-            
-            // อ่านค่าปัจจุบันแล้วสลับค่า (Toggle)
-            onValue(stateRef, (snapshot) => {
-                const currentState = snapshot.val();
-                const updates = {};
-                updates[`displays/display_${displayId}/${feature}/enabled`] = !currentState;
-                update(ref(db), updates);
+                renderZonesEditor();
+                updatePreview();
             }, { onlyOnce: true });
         }
 
-        window.updateMarqueeText = function(displayId) {
-            const textInput = document.getElementById(`text-mq-${displayId}`).value;
-            const updates = {};
-            updates[`displays/display_${displayId}/marquee/text`] = textInput;
-            update(ref(db), updates);
+        function addZone() {
+            currentZones.push({
+                id: 'zone_' + Date.now(),
+                type: 'image',
+                content: '',
+                top: 0, left: 0, width: 50, height: 50 // ค่าเริ่มต้นเป็น %
+            });
+            renderZonesEditor();
+            updatePreview();
         }
 
-        // เริ่มดึงข้อมูลจอ 01
-        listenToDisplay('01');
+        function removeZone(index) {
+            currentZones.splice(index, 1);
+            renderZonesEditor();
+            updatePreview();
+        }
+
+        function renderZonesEditor() {
+            const container = document.getElementById('zones-container');
+            container.innerHTML = ''; // เคลียร์ของเก่า
+
+            currentZones.forEach((zone, index) => {
+                const zoneHTML = `
+                    <div class="zone-card">
+                        <div style="display: flex; justify-content: space-between;">
+                            <strong>กรอบที่ ${index + 1} (${zone.type})</strong>
+                            <button class="danger" style="width: auto; margin:0; padding: 4px 8px;" onclick="removeZone(${index})">ลบ</button>
+                        </div>
+                        <div class="zone-grid">
+                            <div>
+                                <label>ตำแหน่งแนวตั้ง Top (%)</label>
+                                <input type="number" value="${zone.top}" onchange="updateZoneData(${index}, 'top', this.value)">
+                            </div>
+                            <div>
+                                <label>ตำแหน่งแนวนอน Left (%)</label>
+                                <input type="number" value="${zone.left}" onchange="updateZoneData(${index}, 'left', this.value)">
+                            </div>
+                            <div>
+                                <label>ความกว้าง Width (%)</label>
+                                <input type="number" value="${zone.width}" onchange="updateZoneData(${index}, 'width', this.value)">
+                            </div>
+                            <div>
+                                <label>ความสูง Height (%)</label>
+                                <input type="number" value="${zone.height}" onchange="updateZoneData(${index}, 'height', this.value)">
+                            </div>
+                        </div>
+                        <label>ประเภทสื่อ (Media Type)</label>
+                        <select onchange="updateZoneData(${index}, 'type', this.value)">
+                            <option value="image" ${zone.type === 'image' ? 'selected' : ''}>รูปภาพ (Image URL)</option>
+                            <option value="video" ${zone.type === 'video' ? 'selected' : ''}>วิดีโอเล่นวน (Video URL)</option>
+                            <option value="marquee" ${zone.type === 'marquee' ? 'selected' : ''}>ข้อความตัววิ่ง (Marquee Text)</option>
+                        </select>
+                        <label>ข้อมูล (URL ของไฟล์ หรือ ข้อความ)</label>
+                        <input type="text" value="${zone.content}" onchange="updateZoneData(${index}, 'content', this.value)" placeholder="ใส่ URL หรือข้อความที่นี่...">
+                    </div>
+                `;
+                container.innerHTML += zoneHTML;
+            });
+        }
+
+        window.updateZoneData = function(index, field, value) {
+            if(['top', 'left', 'width', 'height'].includes(field)) {
+                currentZones[index][field] = Number(value);
+            } else {
+                currentZones[index][field] = value;
+            }
+            updatePreview();
+        }
+
+        function updatePreview() {
+            const previewBox = document.getElementById('preview-box');
+            const orientation = document.getElementById('orientation-select').value;
+            
+            // ปรับขนาดกล่อง Preview ตามแนวตั้ง/แนวนอน
+            if(orientation === 'landscape') {
+                previewBox.style.width = '640px';
+                previewBox.style.height = '360px';
+            } else {
+                previewBox.style.width = '360px';
+                previewBox.style.height = '640px';
+            }
+
+            // วาดกรอบจำลอง
+            previewBox.innerHTML = '';
+            currentZones.forEach((zone, index) => {
+                const zoneDiv = document.createElement('div');
+                zoneDiv.className = 'preview-zone';
+                zoneDiv.style.top = zone.top + '%';
+                zoneDiv.style.left = zone.left + '%';
+                zoneDiv.style.width = zone.width + '%';
+                zoneDiv.style.height = zone.height + '%';
+                zoneDiv.innerText = `กรอบ ${index + 1}\n(${zone.type})`;
+                previewBox.appendChild(zoneDiv);
+            });
+        }
+
+        function saveToFirebase() {
+            const screenId = document.getElementById('screen-select').value;
+            const orientation = document.getElementById('orientation-select').value;
+            
+            const layoutData = {
+                orientation: orientation,
+                zones: currentZones
+            };
+
+            set(ref(db, 'displays/display_' + screenId), layoutData)
+                .then(() => alert(`ส่งข้อมูลไปที่ Screen ${screenId} เรียบร้อยแล้ว!`))
+                .catch((error) => alert('เกิดข้อผิดพลาด: ' + error));
+        }
+
+        // โหลดข้อมูลจอที่ 1 ทันทีเมื่อเปิดหน้า
+        window.onload = loadScreenData;
     </script>
 </body>
 </html>
