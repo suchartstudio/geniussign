@@ -25,53 +25,89 @@
     <script type="module">
         import { db, ref, onValue, set, onDisconnect } from './firebase-config.js';
 
-        // อ่านค่าพารามิเตอร์จาก URL เช่น ?screen=02 (ถ้าไม่มีให้เป็น 01)
         const urlParams = new URLSearchParams(window.location.search);
         const DISPLAY_ID = urlParams.get('screen') || '01'; 
         
-        // --- ระบบ Presence (รายงานตัวว่าออนไลน์) ---
+        // Presence System
         const connectedRef = ref(db, '.info/connected');
         const presenceRef = ref(db, 'displays/display_' + DISPLAY_ID + '/presence');
-
         onValue(connectedRef, (snap) => {
-            if (snap.val() === true) {
-                // เมื่อต่อเน็ตได้ ให้ตั้งค่าล่วงหน้าว่า ถ้าเน็ตหลุด ให้ Firebase แก้ค่าเป็น 'offline'
-                onDisconnect(presenceRef).set('offline').then(() => {
-                    // แล้วค่อยอัปเดตสถานะปัจจุบันเป็น 'online'
-                    set(presenceRef, 'online');
-                });
-            }
+            if (snap.val() === true) { onDisconnect(presenceRef).set('offline').then(() => { set(presenceRef, 'online'); }); }
         });
-        // ----------------------------------------
         
         const container = document.getElementById('player-container');
-        let layouts = [];
+        
+        // แยกตัวแปรเก็บ Layout 2 ชุด (ปกติ กับ ฉุกเฉิน)
+        let normalLayouts = [];
+        let normalFont = 'Prompt';
+        
+        // ตัวแปรควบคุมระบบเครื่องเล่น
+        let activeLayouts = [];
+        let isEmergencyMode = false;
         let currentLayoutIndex = 0;
         let zoneCleanups = []; 
         let fallbackTimer = null; 
 
+        // 1. ตรวจสอบการตั้งค่าปกติของจอนี้
         onValue(ref(db, 'displays/display_' + DISPLAY_ID), (snapshot) => {
             const data = snapshot.val();
             if(!data || !data.layouts) return;
 
-            if (data.globalFont) {
-                const fontUrl = `https://fonts.googleapis.com/css2?family=${data.globalFont.replace(/ /g, '+')}:wght@300;400;500;700&display=swap`;
-                document.getElementById('dynamic-font').href = fontUrl;
-                document.body.style.fontFamily = `'${data.globalFont}', sans-serif`;
+            normalFont = data.globalFont || 'Prompt';
+            normalLayouts = data.layouts;
+            
+            // ถ้าไม่ได้อยู่ในโหมดฉุกเฉิน ให้ดึงข้อมูลปกติไปรัน
+            if (!isEmergencyMode) {
+                applyFont(normalFont);
+                activeLayouts = normalLayouts;
+                currentLayoutIndex = 0;
+                playCurrentLayout();
             }
-
-            layouts = data.layouts;
-            currentLayoutIndex = 0;
-            playCurrentLayout();
         });
 
-        function playNextLayout() { currentLayoutIndex = (currentLayoutIndex + 1) % layouts.length; playCurrentLayout(); }
+        // 2. ตรวจสอบสัญญาณฉุกเฉิน (Global Override) แบบ Real-time
+        onValue(ref(db, 'global_override'), (snapshot) => {
+            const data = snapshot.val();
+            
+            if (data && data.isActive) {
+                isEmergencyMode = true;
+                if (data.config && data.config.layouts) {
+                    // เปลี่ยนฟอนต์ตามประกาศฉุกเฉิน
+                    applyFont(data.config.globalFont || 'Prompt');
+                    // สลับ Layout ไปใช้ของส่วนกลาง
+                    activeLayouts = data.config.layouts;
+                    currentLayoutIndex = 0;
+                    playCurrentLayout();
+                }
+            } else {
+                // ถ้ายกเลิกโหมดฉุกเฉิน และเคยอยู่ในโหมดนี้มาก่อน
+                if (isEmergencyMode) {
+                    isEmergencyMode = false;
+                    // คืนค่าฟอนต์และ Layout กลับเป็นของเดิม
+                    applyFont(normalFont);
+                    activeLayouts = normalLayouts;
+                    currentLayoutIndex = 0;
+                    playCurrentLayout();
+                }
+            }
+        });
+
+        function applyFont(fontName) {
+            const fontUrl = `https://fonts.googleapis.com/css2?family=${fontName.replace(/ /g, '+')}:wght@300;400;500;700&display=swap`;
+            document.getElementById('dynamic-font').href = fontUrl;
+            document.body.style.fontFamily = `'${fontName}', sans-serif`;
+        }
+
+        // ระบบ Player (ทำงานร่วมกับ activeLayouts)
+        function playNextLayout() { currentLayoutIndex = (currentLayoutIndex + 1) % activeLayouts.length; playCurrentLayout(); }
 
         function playCurrentLayout() {
-            if(layouts.length === 0) return;
+            if(activeLayouts.length === 0) return;
             if(fallbackTimer) clearTimeout(fallbackTimer);
             
-            const layout = layouts[currentLayoutIndex];
+            const layout = activeLayouts[currentLayoutIndex];
+            
+            // ล้างหน้าจอเก่า ตัดวิดีโอ/เสียงเดิมทิ้งทั้งหมดทันที
             zoneCleanups.forEach(cleanupFn => cleanupFn());
             zoneCleanups = [];
             container.innerHTML = ''; 
