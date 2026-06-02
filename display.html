@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080, initial-scale=1.0">
+    <title>Display 01</title>
+    <style>
+        body, html { margin: 0; padding: 0; width: 1920px; height: 1080px; background-color: #000; color: white; overflow: hidden; font-family: sans-serif; }
+        
+        /* Layout พื้นฐาน */
+        .layout-container { display: grid; grid-template-rows: 1fr 80px; width: 100%; height: 100%; }
+        
+        .media-zone {
+            display: flex; justify-content: center; align-items: center; background-color: #111; position: relative;
+        }
+
+        /* แถบตัววิ่ง */
+        .marquee-zone {
+            background-color: #002244; color: #FFF; font-size: 40px; display: flex; align-items: center; white-space: nowrap; overflow: hidden; display: none; /* ซ่อนไว้ก่อนจนกว่าจะเปิด */
+        }
+        .marquee-text { padding-left: 100%; animation: scroll-left 15s linear infinite; }
+        
+        @keyframes scroll-left {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-100%); }
+        }
+
+        /* โซนกล้อง AI */
+        #webcam-container {
+            position: absolute; bottom: 20px; right: 20px; width: 320px; height: 240px; border: 2px solid #555; display: none;
+        }
+        video { width: 100%; height: 100%; object-fit: cover; }
+    </style>
+</head>
+<body>
+
+    <div class="layout-container" id="main-layout">
+        <div class="media-zone">
+            <h1 style="color: #666; font-size: 60px;">Media Layout Area</h1>
+            
+            <div id="webcam-container">
+                <video id="webcam" autoplay playsinline muted></video>
+            </div>
+        </div>
+
+        <div class="marquee-zone" id="marquee-container">
+            <div class="marquee-text" id="marquee-text">กำลังโหลดข้อความ...</div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { db, ref, onValue, update } from './firebase-config.js';
+
+        // กำหนด ID ของจอนี้
+        const DISPLAY_ID = '01'; 
+        
+        const marqueeContainer = document.getElementById('marquee-container');
+        const marqueeText = document.getElementById('marquee-text');
+        const webcamContainer = document.getElementById('webcam-container');
+        const webcamElement = document.getElementById('webcam');
+        let stream = null;
+
+        // รับคำสั่งจาก Firebase แบบ Real-time
+        const displayRef = ref(db, 'displays/display_' + DISPLAY_ID);
+        onValue(displayRef, (snapshot) => {
+            const data = snapshot.val();
+            if(!data) return;
+
+            // 1. จัดการตัววิ่ง (Marquee)
+            if(data.marquee.enabled) {
+                marqueeContainer.style.display = 'flex';
+                marqueeText.innerText = data.marquee.text;
+            } else {
+                marqueeContainer.style.display = 'none';
+            }
+
+            // 2. จัดการ AI Camera
+            if(data.aiCounter.enabled) {
+                if(!stream) startWebcam();
+            } else {
+                if(stream) stopWebcam();
+            }
+        });
+
+        // ฟังก์ชันเปิดกล้อง
+        async function startWebcam() {
+            try {
+                webcamContainer.style.display = 'block';
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                webcamElement.srcObject = stream;
+                
+                // [จุดที่ต้องเพิ่มโค้ด TensorFlow.js สำหรับ Object Detection]
+                // เมื่อรัน AI นับคนได้แล้ว ให้อัปเดตค่ากลับไปที่ Firebase:
+                // update(ref(db), { [`displays/display_${DISPLAY_ID}/aiCounter/currentCount`]: newCount });
+                
+            } catch (err) {
+                console.error("Error accessing webcam: ", err);
+            }
+        }
+
+        // ฟังก์ชันปิดกล้อง
+        function stopWebcam() {
+            if(stream) {
+                stream.getTracks().forEach(track => track.stop());
+                webcamElement.srcObject = null;
+                stream = null;
+            }
+            webcamContainer.style.display = 'none';
+        }
+    </script>
+</body>
+</html>
