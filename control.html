@@ -7,7 +7,7 @@
     <style>
         body { font-family: 'Prompt', sans-serif; background: #1e1e1e; color: #fff; margin: 0; display: flex; height: 100vh; overflow: hidden; transition: all 0.3s; border-top: 5px solid transparent; }
         
-        .sidebar-left { width: 300px; background: #2d2d2d; padding: 20px; overflow-y: auto; border-right: 1px solid #444; flex-shrink: 0; }
+        .sidebar-left { width: 320px; background: #2d2d2d; padding: 20px; overflow-y: auto; border-right: 1px solid #444; flex-shrink: 0; display: flex; flex-direction: column; }
         .main-workspace { flex-grow: 1; padding: 20px; display: flex; flex-direction: column; overflow-y: auto; background: #1a1a1a; }
         .sidebar-right { width: 320px; background: #2d2d2d; padding: 20px; overflow-y: auto; border-left: 1px solid #444; flex-shrink: 0; }
         
@@ -25,22 +25,20 @@
         .canvas-wrapper { background: #000; position: relative; margin: 20px auto; border: 2px solid #555; box-shadow: 0 10px 30px rgba(0,0,0,0.5); background-image: linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px); background-size: 5% 5%; }
         .zone-box { position: absolute; border: 2px solid #4CAF50; resize: both; overflow: hidden; display: flex; flex-direction: column; background: #111; }
         .zone-header { background: #4CAF50; color: #000; width: 100%; font-size: 12px; font-weight: bold; cursor: move; padding: 4px 0; text-align: center; position: relative; z-index: 10; display: flex; justify-content: space-between; align-items: center; padding: 4px 8px; box-sizing: border-box; }
-        .zone-content { flex-grow: 1; width: 100%; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #000; }
+        .zone-content { flex-grow: 1; width: 100%; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #000; overflow: hidden; pointer-events: none; }
         .zone-content img, .zone-content video { width: 100%; height: 100%; object-fit: fill; position: absolute; top:0; left:0; opacity: 0.4; }
         
-        .clock-preview { color: #fff; text-align: center; font-size: 20px; font-weight: bold; z-index: 5; text-shadow: 2px 2px 4px #000; pointer-events: none; }
         .zone-playlist-ui { position: absolute; top: 10px; bottom: 10px; left: 10px; right: 10px; overflow-y: auto; z-index: 5; pointer-events: auto; }
         .zone-media-list-item { background: rgba(0,0,0,0.8); border: 1px solid #555; padding: 4px 8px; margin-bottom: 4px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; font-size: 11px; }
         .zone-media-list-item button { width: auto; background: none; border: none; padding: 0; margin: 0; font-size: 12px; }
-        .btn-delete-zone { background: #d32f2f; color: white; border: none; font-weight: bold; cursor: pointer; padding: 2px 8px; border-radius: 4px; width: auto; font-size: 10px; }
+        .btn-delete-zone { background: #d32f2f; color: white; border: none; font-weight: bold; cursor: pointer; padding: 2px 8px; border-radius: 4px; width: auto; font-size: 10px; pointer-events: auto; }
 
         .layout-tabs { display: flex; gap: 5px; margin-bottom: 10px; flex-wrap: wrap; }
         .tab { padding: 8px 15px; background: #333; border-radius: 4px; cursor: pointer; }
         .tab.active { background: #4CAF50; color: #000; font-weight: bold; }
         
-        /* สไตล์สำหรับ Input ใน Zone ให้กดแก้ไขได้ ไม่แย่ง Drag */
-        .inline-input { background:#000; border:1px solid #555; color:#fff; width:100%; margin-bottom:5px; pointer-events: auto; z-index: 20; padding: 4px; }
-        .prop-row { display:flex; gap:5px; width: 100%; pointer-events: auto; z-index: 20; align-items: center; }
+        .inline-input { background:#000; border:1px solid #555; color:#fff; width:100%; margin-bottom:5px; padding: 4px; }
+        .prop-row { display:flex; gap:5px; width: 100%; align-items: center; margin-top:5px; }
     </style>
     <script>if (sessionStorage.getItem('isAdmin') !== 'true') window.location.href = 'index.html';</script>
 </head>
@@ -63,7 +61,7 @@
             <option value="landscape">แนวนอน (16:9)</option>
             <option value="portrait">แนวตั้ง (9:16)</option>
         </select>
-        <small id="global-helper" style="display:none; color:#ff9800;">*ในโหมดฉุกเฉิน คุณควรสร้าง Layout ให้ครบทั้งแนวนอนและแนวตั้ง เพื่อให้หน้าจอปลายทางดึงไปใช้ได้ถูกต้อง</small>
+        <small id="global-helper" style="display:none; color:#ff9800; margin-top:5px;">*ในโหมดฉุกเฉิน ควรสร้างทั้งแนวนอนและแนวตั้ง</small>
 
         <label>แบบอักษร (Google Fonts):</label>
         <select id="font-select" onchange="changeGlobalFont()">
@@ -74,6 +72,11 @@
             <option value="Bai Jamjuree">Bai Jamjuree (ไบจามจุรี)</option>
             <option value="Mali">Mali (มะลิ)</option>
         </select>
+
+        <div id="zone-editors-wrapper" style="display:none; margin-top:20px; border-top:1px solid #444; padding-top:15px; flex-grow:1;">
+            <h3 style="color:#ff9800; font-size:14px; margin-bottom:10px;">📝 แก้ไขข้อความในจอ</h3>
+            <div id="zone-editors-container"></div>
+        </div>
 
         <div id="btn-normal-mode">
             <button onclick="saveDeploy()" class="primary" style="margin-top: 40px; padding: 15px; background: #4CAF50; font-size:16px;">บันทึก & ส่งขึ้นจอ</button>
@@ -96,7 +99,6 @@
             <button onclick="addTextZone()" style="width: auto; margin: 0; background: #e91e63; color:#fff;">+ ข้อความ</button>
             <button onclick="addMarqueeZone()" style="width: auto; margin: 0; background: #9c27b0; color:#fff;">+ ตัววิ่ง</button>
             <button onclick="addClockZone()" style="width: auto; margin: 0; background: #00bcd4; color:#000;">+ นาฬิกา</button>
-            <button onclick="addTimerZone()" style="width: auto; margin: 0; background: #4CAF50; color:#fff;">+ ตัวจับเวลา</button>
         </div>
 
         <div id="canvas" class="canvas-wrapper" style="width: 800px; height: 450px;"></div>
@@ -117,7 +119,6 @@
         let orientation = 'landscape';
         let globalFont = 'Prompt';
         
-        // แยก Layout สำหรับโหมดฉุกเฉิน
         let layouts = [{ id: 'L1', zones: [] }]; 
         let globalLayouts = { landscape: [{ id: 'L1', zones: [] }], portrait: [{ id: 'L1', zones: [] }] };
         let activeLayoutIndex = 0;
@@ -129,7 +130,6 @@
             document.getElementById('dynamic-font').href = fontUrl; document.body.style.fontFamily = `'${globalFont}', sans-serif`;
         }
 
-        // --- คลังสื่อ ---
         onValue(ref(db, 'media_library'), (snapshot) => {
             const mediaData = snapshot.val();
             const list = document.getElementById('media-list'); list.innerHTML = '';
@@ -166,7 +166,6 @@
         window.renameMedia = function(k, n) { const n2 = prompt("แก้ไขชื่อไฟล์:", n); if(n2 && n2.trim() !== '') update(ref(db, 'media_library/' + k), { name: n2 }); }
         window.deleteMedia = async function(k, p) { if(confirm("ลบไฟล์นี้ถาวร?")) { try { await deleteObject(storageRef(storage, p)); await remove(ref(db, 'media_library/' + k)); } catch(e){} } }
 
-        // --- โหลดข้อมูล ---
         window.loadData = function() {
             currentScreen = document.getElementById('screen-select').value;
             if(currentScreen === 'GLOBAL') {
@@ -214,24 +213,48 @@
         window.updateCanvas = function() {
             orientation = document.getElementById('orientation-select').value; 
             if(currentScreen === 'GLOBAL') layouts = globalLayouts[orientation];
-            
             const canvas = document.getElementById('canvas');
             if(orientation === 'landscape') { canvas.style.width = '800px'; canvas.style.height = '450px'; } else { canvas.style.width = '253px'; canvas.style.height = '450px'; }
             renderCanvas();
         }
 
-        // Functions สร้าง Zone
         window.addZone = function() { layouts[activeLayoutIndex].zones.push({ id: Date.now(), top: 10, left: 10, width: 40, height: 40, type: 'media', playlist: [] }); renderCanvas(); }
-        window.addClockZone = function() { layouts[activeLayoutIndex].zones.push({ id: Date.now(), top: 10, left: 10, width: 30, height: 20, type: 'clock', fontSize: 40, color: '#00bcd4' }); renderCanvas(); }
-        window.addMarqueeZone = function() { layouts[activeLayoutIndex].zones.push({ id: Date.now(), top: 10, left: 10, width: 60, height: 15, type: 'marquee', text: 'ตัววิ่ง...', speed: 5, fontSize: 30, color: '#ffffff' }); renderCanvas(); }
-        window.addTextZone = function() { layouts[activeLayoutIndex].zones.push({ id: Date.now(), top: 10, left: 10, width: 30, height: 20, type: 'text', text: 'ข้อความ', fontSize: 30, color: '#ffffff' }); renderCanvas(); }
-        
-        // เครื่องมือจับเวลาแบบใหม่ (รวมนับขึ้นและลง)
-        window.addTimerZone = function() { layouts[activeLayoutIndex].zones.push({ id: Date.now(), top: 10, left: 10, width: 30, height: 20, type: 'timer', mode: 'up', targetTime: '', fontSize: 40, color: '#4caf50' }); renderCanvas(); }
+        window.addClockZone = function() { layouts[activeLayoutIndex].zones.push({ id: Date.now(), top: 10, left: 10, width: 30, height: 20, type: 'clock' }); renderCanvas(); }
+        window.addMarqueeZone = function() { layouts[activeLayoutIndex].zones.push({ id: Date.now(), top: 10, left: 10, width: 60, height: 15, type: 'marquee', text: 'ตัววิ่ง...', fontSize: 40, color: '#ffffff' }); renderCanvas(); }
+        window.addTextZone = function() { layouts[activeLayoutIndex].zones.push({ id: Date.now(), top: 10, left: 10, width: 30, height: 20, type: 'text', text: 'ข้อความ', fontSize: 40, color: '#ffffff' }); renderCanvas(); }
         
         window.removeZone = function(idx) { layouts[activeLayoutIndex].zones.splice(idx, 1); renderCanvas(); }
         window.removeMediaFromZone = function(zIdx, mIdx) { layouts[activeLayoutIndex].zones[zIdx].playlist.splice(mIdx, 1); renderCanvas(); }
         window.updateZoneProp = function(zoneIndex, prop, value) { layouts[activeLayoutIndex].zones[zoneIndex][prop] = value; }
+
+        function renderZoneEditors() {
+            const container = document.getElementById('zone-editors-container');
+            const wrapper = document.getElementById('zone-editors-wrapper');
+            container.innerHTML = '';
+            const zones = layouts[activeLayoutIndex].zones || [];
+            let hasTextZones = false;
+
+            zones.forEach((zone, index) => {
+                if (zone.type === 'text' || zone.type === 'marquee') {
+                    hasTextZones = true;
+                    let title = zone.type === 'text' ? 'ข้อความ' : 'ตัววิ่ง';
+                    
+                    let html = `
+                    <div style="background:#333; padding:10px; border-radius:4px; margin-bottom:10px;">
+                        <div style="font-size:12px; color:#aaa; margin-bottom:5px;">โซน ${index + 1} (${title})</div>
+                        <input type="text" class="inline-input" value="${zone.text || ''}" placeholder="พิมพ์ข้อความ..." oninput="updateZoneProp(${index}, 'text', this.value); renderCanvas();">
+                        <div class="prop-row">
+                            <label style="margin:0; font-size:11px;">ขนาด:</label>
+                            <input type="number" class="inline-input" style="width:60px; margin:0;" value="${zone.fontSize || 40}" onchange="updateZoneProp(${index}, 'fontSize', this.value); renderCanvas();">
+                            <label style="margin:0 0 0 10px; font-size:11px;">สี:</label>
+                            <input type="color" style="width:30px; height:30px; padding:0; cursor:pointer; border:none; background:transparent;" value="${zone.color || '#ffffff'}" onchange="updateZoneProp(${index}, 'color', this.value); renderCanvas();">
+                        </div>
+                    </div>`;
+                    container.innerHTML += html;
+                }
+            });
+            wrapper.style.display = hasTextZones ? 'flex' : 'none';
+        }
 
         function renderCanvas() {
             const canvas = document.getElementById('canvas'); canvas.innerHTML = '';
@@ -243,54 +266,28 @@
                 
                 let innerContent = '';
                 
-                // เพิ่ม onmouseup เพื่อแก้บั๊กคลิกแล้วเด้งหลุด
-                const renderTools = (showText) => `
-                    <div style="padding:10px; width:100%; box-sizing: border-box; display:flex; flex-direction:column; gap:5px; pointer-events:auto; z-index:20;" 
-                         onmousedown="event.stopPropagation();" onmouseup="event.stopPropagation();">
-                        ${showText ? `<input type="text" class="inline-input" value="${zone.text || ''}" placeholder="ระบุข้อความ" onchange="updateZoneProp(${index}, 'text', this.value); renderCanvas();">` : ''}
-                        <div class="prop-row">
-                            <label style="margin:0; font-size:10px;">ขนาด:</label>
-                            <input type="number" class="inline-input" style="width:60px; margin:0;" value="${zone.fontSize || 30}" onchange="updateZoneProp(${index}, 'fontSize', this.value); renderCanvas();">
-                            <label style="margin:0; font-size:10px;">สี:</label>
-                            <input type="color" style="width:30px; height:30px; padding:0; cursor:pointer;" value="${zone.color || '#ffffff'}" onchange="updateZoneProp(${index}, 'color', this.value); renderCanvas();">
-                        </div>
-                    </div>`;
-
                 if (zone.type === 'media') {
                     if (!zone.playlist) zone.playlist = [];
                     el.ondragover = (e) => e.preventDefault();
                     el.ondrop = (e) => { e.preventDefault(); zone.playlist.push({ url: e.dataTransfer.getData('mediaUrl'), type: e.dataTransfer.getData('mediaType'), name: e.dataTransfer.getData('mediaName') || 'ไฟล์สื่อ' }); renderCanvas(); };
                     let bgPreview = '';
                     if(zone.playlist.length > 0) bgPreview = zone.playlist[0].type === 'video' ? `<video src="${zone.playlist[0].url}" autoplay loop muted></video>` : `<img src="${zone.playlist[0].url}">`;
-                    let playlistHtml = zone.playlist.map((item, i) => `<div class="zone-media-list-item"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${item.type==='video'?'🎥':'🖼️'} ${item.name}</span><button onmousedown="event.stopPropagation(); removeMediaFromZone(${index}, ${i})" title="ลบไฟล์นี้">❌</button></div>`).join('');
+                    let playlistHtml = zone.playlist.map((item, i) => `<div class="zone-media-list-item" style="pointer-events:auto;"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${item.type==='video'?'🎥':'🖼️'} ${item.name}</span><button onmousedown="event.stopPropagation(); removeMediaFromZone(${index}, ${i})" title="ลบไฟล์นี้">❌</button></div>`).join('');
                     innerContent = `${bgPreview}<div class="zone-playlist-ui">${zone.playlist.length === 0 ? '<div style="color:#fff; text-align:center; font-size:12px; margin-top:20px;">ลากไฟล์มาวาง</div>' : playlistHtml}</div>`;
                 } else if (zone.type === 'clock') { 
-                    innerContent = `<div style="text-align:center; color:#888; font-size:12px; position:absolute; top:5px; width:100%;">พรีวิวตั้งค่านาฬิกา</div>` + renderTools(false);
-                } else if (zone.type === 'timer') {
-                    // แผงตั้งค่าเวลาใหม่ เลือกว่าจะนับขึ้น หรือนับลง
-                    innerContent = `
-                    <div style="padding:10px; width:100%; box-sizing:border-box; pointer-events:auto; z-index:20;" onmousedown="event.stopPropagation();" onmouseup="event.stopPropagation();">
-                        <select class="inline-input" onchange="updateZoneProp(${index}, 'mode', this.value); renderCanvas();">
-                            <option value="up" ${zone.mode === 'up' ? 'selected' : ''}>นับเวลาขึ้น</option>
-                            <option value="down" ${zone.mode === 'down' ? 'selected' : ''}>นับเวลาลง (ถอยหลัง)</option>
-                        </select>
-                        ${zone.mode === 'down' ? `<input type="datetime-local" class="inline-input" value="${zone.targetTime || ''}" onchange="updateZoneProp(${index}, 'targetTime', this.value); renderCanvas();">` : ''}
-                        <div class="prop-row">
-                            <label style="margin:0; font-size:10px;">ขนาด:</label>
-                            <input type="number" class="inline-input" style="width:60px; margin:0;" value="${zone.fontSize || 40}" onchange="updateZoneProp(${index}, 'fontSize', this.value); renderCanvas();">
-                            <label style="margin:0; font-size:10px;">สี:</label>
-                            <input type="color" style="width:30px; height:30px; padding:0; cursor:pointer;" value="${zone.color || '#4caf50'}" onchange="updateZoneProp(${index}, 'color', this.value); renderCanvas();">
-                        </div>
-                    </div>`;
+                    innerContent = `<div style="width:100%; height:100%; display:flex; justify-content:center; align-items:center; text-align:center; color:#00bcd4; font-size:24px; font-weight:bold;">⏱️ นาฬิกา</div>`;
                 } else if (zone.type === 'marquee' || zone.type === 'text') {
-                    innerContent = renderTools(true);
+                    // แสดงผลแบบ Preview ให้อ่านง่าย และจับลากได้ ไม่เกะกะ
+                    innerContent = `<div style="width:100%; height:100%; display:flex; justify-content:center; align-items:center; color:${zone.color || '#fff'}; font-size:${zone.fontSize || 40}px; overflow:hidden; text-align:center; white-space:nowrap;">${zone.text || '(ระบุข้อความด้านซ้าย)'}</div>`;
                 }
 
-                let icon = zone.type==='clock'?'⏱️ นาฬิกา': zone.type==='marquee'?'🏃 ตัววิ่ง': zone.type==='text'?'📝 ข้อความ': zone.type==='timer'?'⏳ จับเวลา': '🖼️ รูป/วิดีโอ';
+                let icon = zone.type==='clock'?'⏱️ นาฬิกา': zone.type==='marquee'?'🏃 ตัววิ่ง': zone.type==='text'?'📝 ข้อความ': '🖼️ รูป/วิดีโอ';
                 el.innerHTML = `<div class="zone-header" onmousedown="startDrag(event, ${index})"><span>${icon}</span><button class="btn-delete-zone" onmousedown="event.stopPropagation(); removeZone(${index})">✖ ลบ</button></div><div class="zone-content">${innerContent}</div>`;
                 el.onmouseup = () => { let newW = Math.round((el.offsetWidth / canvas.offsetWidth) * 100 / 5) * 5; let newH = Math.round((el.offsetHeight / canvas.offsetHeight) * 100 / 5) * 5; zone.width = Math.max(5, Math.min(newW, 100 - zone.left)); zone.height = Math.max(5, Math.min(newH, 100 - zone.top)); renderCanvas(); };
                 canvas.appendChild(el);
             });
+            
+            renderZoneEditors(); // สั่งวาดเมนูแก้ไขข้อความด้านซ้าย
         }
 
         window.startDrag = function(e, zoneIndex) {
@@ -306,19 +303,11 @@
             document.addEventListener('mousemove', onMouseMove); document.addEventListener('mouseup', onMouseUp);
         }
 
-        function syncStopwatchTimes(arr) {
-            const now = Date.now();
-            arr.forEach(l => { if(l.zones) l.zones.forEach(z => { if(z.type === 'timer') z.startTime = now; }); });
-        }
-
         window.saveDeploy = function() {
-            syncStopwatchTimes(layouts);
             set(ref(db, 'displays/display_' + currentScreen), { orientation, globalFont, layouts }).then(() => alert(`ส่งข้อมูลขึ้น ${currentScreen} สำเร็จ!`));
         }
 
         window.startEmergency = function() {
-            syncStopwatchTimes(globalLayouts.landscape);
-            syncStopwatchTimes(globalLayouts.portrait);
             set(ref(db, 'global_override/config'), { landscape: globalLayouts.landscape, portrait: globalLayouts.portrait, globalFont }).then(() => { 
                 update(ref(db, 'global_override'), { isActive: true }); 
                 alert('🚨 ถ่ายทอดสดประกาศฉุกเฉินไปยังทุกจอเรียบร้อยแล้ว!'); 
