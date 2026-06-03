@@ -48,7 +48,8 @@
         });
 
         const grid = document.getElementById('status-grid');
-        for(let i=1; i<=10; i++) {
+        // แก้ไขลูปตรงนี้จากเดิม 10 เป็น 12 จอภาพ
+        for(let i=1; i<=12; i++) {
             let id = i < 10 ? '0'+i : i.toString();
             grid.innerHTML += `
                 <div class="screen-card" id="card-${id}">
