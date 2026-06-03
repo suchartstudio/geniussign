@@ -12,9 +12,8 @@
         .zone-media.active { opacity: 1; z-index: 2; }
         .zone-media.fade-out { opacity: 0; z-index: 1; }
         
-        /* สไตล์สำหรับปุ่ม Kiosk Mode */
-        #start-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.9); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #fff; }
-        .btn-start { padding: 20px 40px; font-size: 24px; background: #4CAF50; color: #fff; border: none; border-radius: 10px; cursor: pointer; font-family: 'Prompt', sans-serif; transition: transform 0.2s, background 0.2s; font-weight: bold; }
+        #start-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.9); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #fff; font-family: 'Chakra Petch', sans-serif; }
+        .btn-start { padding: 20px 40px; font-size: 24px; background: #4CAF50; color: #fff; border: none; border-radius: 10px; cursor: pointer; font-family: inherit; transition: transform 0.2s, background 0.2s; font-weight: bold; }
         .btn-start:hover { background: #45a049; transform: scale(1.05); }
     </style>
 </head>
@@ -40,9 +39,7 @@
             }
             window.isAudioUnlocked = true;
             
-            document.querySelectorAll('video').forEach(vid => {
-                vid.muted = false;
-            });
+            document.querySelectorAll('video').forEach(vid => { vid.muted = false; });
         }
 
         const urlParams = new URLSearchParams(window.location.search);
@@ -127,9 +124,7 @@
                 zoneDiv.style.top = zone.top + '%'; zoneDiv.style.left = zone.left + '%';
                 zoneDiv.style.width = zone.width + '%'; zoneDiv.style.height = zone.height + '%';
                 
-                // ใช้ Layer Z-Index แบบเดียวกับตัว Control Panel
                 zoneDiv.style.zIndex = zone.zIndex || 10;
-                
                 container.appendChild(zoneDiv);
 
                 if (zone.type === 'clock') {
