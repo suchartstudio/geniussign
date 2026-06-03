@@ -7,11 +7,11 @@
     <style>
         body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; background: #000; overflow: hidden; font-family: 'Prompt', sans-serif; transition: font-family 0.3s; }
         #player-container { position: relative; width: 100%; height: 100%; }
-        .zone-element { position: absolute; overflow: hidden; background: #000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .zone-element { position: absolute; overflow: hidden; background: transparent; display: flex; flex-direction: column; justify-content: center; align-items: center; }
         .zone-media { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: fill; opacity: 0; transition: opacity 1s ease-in-out; }
         .zone-media.active { opacity: 1; z-index: 2; }
         .zone-media.fade-out { opacity: 0; z-index: 1; }
-        .clock-container { width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #0a0a0a; color: #fff; z-index: 5; text-align: center; }
+        .clock-container { width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: transparent; color: #fff; z-index: 5; text-align: center; }
         .clock-time { font-size: 15vh; font-weight: 700; line-height: 1; margin-bottom: 2vh; text-shadow: 0 0 20px rgba(0, 188, 212, 0.5); color: #00bcd4; }
         .clock-date { font-size: 5vh; font-weight: 400; color: #ccc; }
     </style>
@@ -28,7 +28,6 @@
         const urlParams = new URLSearchParams(window.location.search);
         const DISPLAY_ID = urlParams.get('screen') || '01'; 
         
-        // Presence System
         const connectedRef = ref(db, '.info/connected');
         const presenceRef = ref(db, 'displays/display_' + DISPLAY_ID + '/presence');
         onValue(connectedRef, (snap) => {
@@ -36,58 +35,34 @@
         });
         
         const container = document.getElementById('player-container');
-        
-        // แยกตัวแปรเก็บ Layout 2 ชุด (ปกติ กับ ฉุกเฉิน)
-        let normalLayouts = [];
-        let normalFont = 'Prompt';
-        
-        // ตัวแปรควบคุมระบบเครื่องเล่น
-        let activeLayouts = [];
-        let isEmergencyMode = false;
-        let currentLayoutIndex = 0;
-        let zoneCleanups = []; 
-        let fallbackTimer = null; 
+        let normalLayouts = []; let normalFont = 'Prompt';
+        let activeLayouts = []; let isEmergencyMode = false;
+        let currentLayoutIndex = 0; let zoneCleanups = []; let fallbackTimer = null; 
 
-        // 1. ตรวจสอบการตั้งค่าปกติของจอนี้
         onValue(ref(db, 'displays/display_' + DISPLAY_ID), (snapshot) => {
             const data = snapshot.val();
             if(!data || !data.layouts) return;
-
             normalFont = data.globalFont || 'Prompt';
             normalLayouts = data.layouts;
-            
-            // ถ้าไม่ได้อยู่ในโหมดฉุกเฉิน ให้ดึงข้อมูลปกติไปรัน
             if (!isEmergencyMode) {
                 applyFont(normalFont);
-                activeLayouts = normalLayouts;
-                currentLayoutIndex = 0;
-                playCurrentLayout();
+                activeLayouts = normalLayouts; currentLayoutIndex = 0; playCurrentLayout();
             }
         });
 
-        // 2. ตรวจสอบสัญญาณฉุกเฉิน (Global Override) แบบ Real-time
         onValue(ref(db, 'global_override'), (snapshot) => {
             const data = snapshot.val();
-            
             if (data && data.isActive) {
                 isEmergencyMode = true;
                 if (data.config && data.config.layouts) {
-                    // เปลี่ยนฟอนต์ตามประกาศฉุกเฉิน
                     applyFont(data.config.globalFont || 'Prompt');
-                    // สลับ Layout ไปใช้ของส่วนกลาง
-                    activeLayouts = data.config.layouts;
-                    currentLayoutIndex = 0;
-                    playCurrentLayout();
+                    activeLayouts = data.config.layouts; currentLayoutIndex = 0; playCurrentLayout();
                 }
             } else {
-                // ถ้ายกเลิกโหมดฉุกเฉิน และเคยอยู่ในโหมดนี้มาก่อน
                 if (isEmergencyMode) {
                     isEmergencyMode = false;
-                    // คืนค่าฟอนต์และ Layout กลับเป็นของเดิม
                     applyFont(normalFont);
-                    activeLayouts = normalLayouts;
-                    currentLayoutIndex = 0;
-                    playCurrentLayout();
+                    activeLayouts = normalLayouts; currentLayoutIndex = 0; playCurrentLayout();
                 }
             }
         });
@@ -98,7 +73,6 @@
             document.body.style.fontFamily = `'${fontName}', sans-serif`;
         }
 
-        // ระบบ Player (ทำงานร่วมกับ activeLayouts)
         function playNextLayout() { currentLayoutIndex = (currentLayoutIndex + 1) % activeLayouts.length; playCurrentLayout(); }
 
         function playCurrentLayout() {
@@ -106,14 +80,11 @@
             if(fallbackTimer) clearTimeout(fallbackTimer);
             
             const layout = activeLayouts[currentLayoutIndex];
-            
-            // ล้างหน้าจอเก่า ตัดวิดีโอ/เสียงเดิมทิ้งทั้งหมดทันที
             zoneCleanups.forEach(cleanupFn => cleanupFn());
-            zoneCleanups = [];
-            container.innerHTML = ''; 
+            zoneCleanups = []; container.innerHTML = ''; 
 
             const zones = layout.zones || [];
-            const mediaZones = zones.filter(z => z.type !== 'clock' && z.playlist && z.playlist.length > 0);
+            const mediaZones = zones.filter(z => (!z.type || z.type === 'media') && z.playlist && z.playlist.length > 0);
             const totalMediaZones = mediaZones.length;
             let zonesCompletedCount = 0;
             let isLayoutFinished = false;
@@ -124,8 +95,7 @@
                 if(isLayoutFinished) return;
                 zonesCompletedCount++;
                 if(zonesCompletedCount >= totalMediaZones && totalMediaZones > 0) {
-                    isLayoutFinished = true;
-                    playNextLayout();
+                    isLayoutFinished = true; playNextLayout();
                 }
             }
 
@@ -137,11 +107,25 @@
                 container.appendChild(zoneDiv);
 
                 if (zone.type === 'clock') {
-                    const cleanup = renderClockZone(zoneDiv);
-                    zoneCleanups.push(cleanup);
-                } else if (zone.playlist && zone.playlist.length > 0) {
-                    const cleanup = playZonePlaylist(zoneDiv, zone.playlist, onZoneLoopComplete);
-                    zoneCleanups.push(cleanup);
+                    const cleanup = renderClockZone(zoneDiv); zoneCleanups.push(cleanup);
+                } else if (zone.type === 'marquee') {
+                    zoneDiv.innerHTML = `
+                        <div style="width:100%; height:100%; display:flex; align-items:center; overflow:hidden; white-space:nowrap; color:#fff; font-size: 5vh; background:rgba(0,0,0,0.5);">
+                            <marquee scrollamount="${zone.speed || 5}">${zone.text || '...'}</marquee>
+                        </div>`;
+                } else if (zone.type === 'text') {
+                    zoneDiv.innerHTML = `
+                        <div style="width:100%; height:100%; display:flex; justify-content:center; align-items:center; color:${zone.color || '#ffffff'}; font-size:${zone.fontSize || 40}px; text-align:${zone.textAlign || 'center'}; padding:10px; box-sizing:border-box; word-break:break-word;">
+                            ${zone.text || ''}
+                        </div>`;
+                } else if (!zone.type || zone.type === 'media') {
+                    if (zone.playlist && zone.playlist.length > 0) {
+                        zoneDiv.style.background = '#000'; // ให้กรอบสื่อทึบแสง
+                        const cleanup = playZonePlaylist(zoneDiv, zone.playlist, onZoneLoopComplete);
+                        zoneCleanups.push(cleanup);
+                    } else {
+                        onZoneLoopComplete();
+                    }
                 }
             });
         }
@@ -149,9 +133,7 @@
         function renderClockZone(zoneDiv) {
             const clockHtml = `<div class="clock-container"><div class="clock-time">00:00:00</div><div class="clock-date">วัน เดือน ปี</div></div>`;
             zoneDiv.innerHTML = clockHtml;
-            const timeEl = zoneDiv.querySelector('.clock-time');
-            const dateEl = zoneDiv.querySelector('.clock-date');
-            
+            const timeEl = zoneDiv.querySelector('.clock-time'); const dateEl = zoneDiv.querySelector('.clock-date');
             const updateClock = () => {
                 const now = new Date();
                 timeEl.innerText = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -164,7 +146,6 @@
 
         function playZonePlaylist(zoneDiv, playlist, onLoopComplete) {
             let currentIndex = 0; let currentElement = null; let zoneTimer = null;
-
             function showNextMedia() {
                 if (currentElement) {
                     currentElement.classList.remove('active'); currentElement.classList.add('fade-out');
