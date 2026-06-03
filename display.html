@@ -36,7 +36,6 @@
         let activeLayouts = []; let isEmergencyMode = false;
         let currentLayoutIndex = 0; let zoneCleanups = []; let fallbackTimer = null; 
         
-        // ตัวแปรส่วนกลางสำหรับจำสถานะว่า หน้าจอนี้ได้รับการอนุญาตให้เปิดเสียงหรือยัง
         let isAudioUnlocked = false;
 
         onValue(ref(db, 'displays/display_' + DISPLAY_ID), (snapshot) => {
@@ -82,12 +81,13 @@
             if(!activeLayouts || activeLayouts.length === 0) return;
             if(fallbackTimer) clearTimeout(fallbackTimer);
             
-            const layout = activeLayouts[currentLayoutIndex];
+            // เรียกฟังก์ชันเคลียร์สถานะของเก่าอย่างเด็ดขาดก่อนเริ่ม Layout ใหม่
             zoneCleanups.forEach(cleanupFn => cleanupFn());
             zoneCleanups = []; container.innerHTML = ''; 
 
-            const zones = layout.zones || [];
-            const mediaZones = zones.filter(z => (!z.type || z.type === 'media') && z.playlist && z.playlist.length > 0);
+            const zones = layout = activeLayouts[currentLayoutIndex];
+            const zonesList = layout.zones || [];
+            const mediaZones = zonesList.filter(z => (!z.type || z.type === 'media') && z.playlist && z.playlist.length > 0);
             const totalMediaZones = mediaZones.length;
             let zonesCompletedCount = 0; let isLayoutFinished = false;
 
@@ -101,7 +101,7 @@
                 }
             }
 
-            zones.forEach(zone => {
+            zonesList.forEach(zone => {
                 const zoneDiv = document.createElement('div');
                 zoneDiv.className = 'zone-element';
                 zoneDiv.style.top = zone.top + '%'; zoneDiv.style.left = zone.left + '%';
@@ -125,11 +125,7 @@
                     const uc = () => {
                         const diff = target - Date.now();
                         if(diff <= 0) { tEl.innerText = "00:00:00"; return; }
-                        
-                        const h = Math.floor(diff / (1000 * 60 * 60)); 
-                        const m = Math.floor((diff / (1000 * 60)) % 60); 
-                        const s = Math.floor((diff / 1000) % 60);
-                        
+                        const h = Math.floor(diff / (1000 * 60 * 60)); const m = Math.floor((diff / (1000 * 60)) % 60); const s = Math.floor((diff / 1000) % 60);
                         tEl.innerText = String(h).padStart(2,'0') + ":" + String(m).padStart(2,'0') + ":" + String(s).padStart(2,'0');
                     };
                     uc(); const timer = setInterval(uc, 1000); zoneCleanups.push(() => clearInterval(timer));
@@ -161,35 +157,33 @@
             });
         }
 
-        // ฟังก์ชันสร้างปุ่มปลดล็อกเสียงแบบปลอดภัย
         function showAudioUnlockButton() {
             if (document.getElementById('audio-unlock-btn')) return;
-            
             let btn = document.createElement('button');
             btn.id = 'audio-unlock-btn';
             btn.innerHTML = '🔊 หน้าจอปิดเสียงอยู่ คลิกตรงนี้เพื่อเปิดเสียงป้าย';
             btn.style.cssText = 'position:absolute; top:20px; left:50%; transform:translateX(-50%); z-index:9999; padding:15px 30px; font-size:18px; font-weight:bold; font-family:inherit; background:#4CAF50; color:white; border:none; border-radius:8px; cursor:pointer; text-align:center; box-shadow: 0 4px 15px rgba(0,0,0,0.6);';
-            
             btn.onclick = (e) => {
-                e.stopPropagation();
-                isAudioUnlocked = true; // บันทึกว่าถูกปลดล็อกแล้วสิทธิ์เว็บทำงานสมบูรณ์
-                btn.remove(); // ลบปุ่มทิ้งอย่างถาวร
-                
-                // ปลดล็อกเสียงวิดีโอทั้งหมดที่เล่นอยู่ ณ วินาทีนั้นทันที
-                document.querySelectorAll('video').forEach(v => {
-                    v.muted = false;
-                    v.play().catch(err => console.log(err));
-                });
+                e.stopPropagation(); isAudioUnlocked = true; btn.remove();
+                document.querySelectorAll('video').forEach(v => { v.muted = false; v.play().catch(e=>console.log(e)); });
             };
             document.body.appendChild(btn);
         }
 
         function playZonePlaylist(zoneDiv, playlist, onLoopComplete) {
             let currentIndex = 0; let currentElement = null; let zoneTimer = null;
-            
+            let isDestroyed = false; // ตัวควบคุมสถานะป้องกันโค้ดรันซ้อนกันเบื้องหลัง
+
             function showNextMedia() {
+                if (isDestroyed) return; // หากยกเลิกลูปนี้แล้ว ให้หยุดทำงานทันที
+                
+                // ก่อนจะเคลียร์อันเก่า ให้สั่งหยุดเล่นเสียงและหยุดภาพทันที ป้องกันเสียงค้างตอน Fade-out
                 if (currentElement) {
                     currentElement.classList.remove('active'); currentElement.classList.add('fade-out');
+                    if (currentElement.tagName === 'VIDEO') {
+                        currentElement.pause();
+                        currentElement.muted = true;
+                    }
                     setTimeout((el) => { if(el && el.parentNode) el.parentNode.removeChild(el); }, 1000, currentElement);
                 }
                 
@@ -201,17 +195,13 @@
                     nextElement.className = 'zone-media';
                     nextElement.autoplay = true;
                     nextElement.playsInline = true;
+                    nextElement.loop = false; // ปิดการวนซ้ำในตัววิดีโออย่างเด็ดขาด
                     
-                    // หากยังไม่กดปลดล็อก ให้บังคับ Muted ไว้ก่อน เพื่อให้ภาพขึ้น 100% ป้องกันจอดำ
                     nextElement.muted = !isAudioUnlocked;
-                    
                     nextElement.onended = proceedToNext;
                     nextElement.onerror = () => { zoneTimer = setTimeout(proceedToNext, 1000); };
                     
-                    // ตรวจสอบเรียกปุ่มปลดล็อกเสียงถ้ายังไม่ได้กด
-                    if (!isAudioUnlocked) {
-                        showAudioUnlockButton();
-                    }
+                    if (!isAudioUnlocked) { showAudioUnlockButton(); }
                 } else {
                     nextElement = document.createElement('img');
                     nextElement.src = item.url; 
@@ -222,12 +212,11 @@
                 zoneDiv.appendChild(nextElement);
                 
                 setTimeout(() => { 
+                    if (isDestroyed) return;
                     nextElement.classList.add('active'); 
                     if (item.type === 'video') {
                         nextElement.play().catch(error => {
-                            console.warn("Autoplay block protection triggered:", error);
-                            nextElement.muted = true;
-                            nextElement.play().catch(e => console.error(e));
+                            nextElement.muted = true; nextElement.play().catch(e => console.error(e));
                         });
                     }
                 }, 50);
@@ -236,13 +225,30 @@
             }
 
             function proceedToNext() {
+                if (isDestroyed) return;
                 currentIndex++;
-                if (currentIndex >= playlist.length) { currentIndex = 0; onLoopComplete(); }
+                if (currentIndex >= playlist.length) { 
+                    currentIndex = 0; 
+                    onLoopComplete(); 
+                    if (isDestroyed) return; // ถ้าเปลี่ยนหน้าหรือรีรันลูปใหม่จากคำสั่งด้านบน ให้ตัดจบที่ตรงนี้ทันที ไม่สร้างอันซ้อนซ้ำ
+                }
                 showNextMedia();
             }
 
             showNextMedia();
-            return () => { if(zoneTimer) clearTimeout(zoneTimer); };
+            
+            // ฟังก์ชัน Cleanup สำหรับทำลายกระบวนการเก่าทิ้งทั้งหมดเมื่อมีการเปลี่ยน Layout
+            return () => { 
+                isDestroyed = true; 
+                if(zoneTimer) clearTimeout(zoneTimer); 
+                if (currentElement) {
+                    if (currentElement.tagName === 'VIDEO') {
+                        currentElement.pause();
+                        currentElement.muted = true;
+                    }
+                    if (currentElement.parentNode) currentElement.parentNode.removeChild(currentElement);
+                }
+            };
         }
     </script>
 </body>
