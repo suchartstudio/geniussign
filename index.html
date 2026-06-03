@@ -7,7 +7,7 @@
     <style>
         body { font-family: 'Prompt', sans-serif; background: #121212; color: #fff; margin: 0; padding: 30px; }
         .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 20px; }
-        .header h1 { display: flex; align-items: center; gap: 15px; margin: 0; }
+        .header h1 { display: flex; align-items: center; gap: 15px; margin: 0; font-size: 24px; }
         
         .btn-admin { background: #4CAF50; color: #000; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 16px; font-family: 'Prompt', sans-serif; }
         .btn-admin:hover { background: #45a049; }
@@ -53,7 +53,8 @@
         });
 
         const grid = document.getElementById('status-grid');
-        for(let i=1; i<=10; i++) {
+        // ปรับการวนลูปเป็น 12 จอ
+        for(let i=1; i<=12; i++) {
             let id = i < 10 ? '0'+i : i.toString();
             grid.innerHTML += `
                 <div class="screen-card" id="card-${id}">
