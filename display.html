@@ -11,9 +11,6 @@
         .zone-media { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: fill; opacity: 0; transition: opacity 1s ease-in-out; }
         .zone-media.active { opacity: 1; z-index: 2; }
         .zone-media.fade-out { opacity: 0; z-index: 1; }
-        .clock-container { width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: transparent; color: #fff; z-index: 5; text-align: center; }
-        .clock-time { font-size: 15vh; font-weight: 700; line-height: 1; margin-bottom: 2vh; text-shadow: 0 0 20px rgba(0, 188, 212, 0.5); color: #00bcd4; }
-        .clock-date { font-size: 5vh; font-weight: 400; color: #ccc; }
     </style>
 </head>
 <body>
@@ -35,28 +32,34 @@
         });
         
         const container = document.getElementById('player-container');
-        let normalLayouts = []; let normalFont = 'Prompt';
+        let normalLayouts = []; let normalFont = 'Prompt'; let normalOrientation = 'landscape';
         let activeLayouts = []; let isEmergencyMode = false;
         let currentLayoutIndex = 0; let zoneCleanups = []; let fallbackTimer = null; 
 
+        // 1. รับการตั้งค่าปกติของจอ
         onValue(ref(db, 'displays/display_' + DISPLAY_ID), (snapshot) => {
             const data = snapshot.val();
             if(!data || !data.layouts) return;
             normalFont = data.globalFont || 'Prompt';
+            normalOrientation = data.orientation || 'landscape';
             normalLayouts = data.layouts;
+            
             if (!isEmergencyMode) {
                 applyFont(normalFont);
                 activeLayouts = normalLayouts; currentLayoutIndex = 0; playCurrentLayout();
             }
         });
 
+        // 2. รับการตั้งค่าโหมดฉุกเฉิน
         onValue(ref(db, 'global_override'), (snapshot) => {
             const data = snapshot.val();
             if (data && data.isActive) {
                 isEmergencyMode = true;
-                if (data.config && data.config.layouts) {
+                if (data.config) {
                     applyFont(data.config.globalFont || 'Prompt');
-                    activeLayouts = data.config.layouts; currentLayoutIndex = 0; playCurrentLayout();
+                    // ดึง Layout ฉุกเฉิน ให้ตรงกับแนวจอ (Landscape/Portrait) ของจอนี้อัตโนมัติ
+                    const overrideConfig = data.config[normalOrientation] || data.config.landscape;
+                    activeLayouts = overrideConfig || []; currentLayoutIndex = 0; playCurrentLayout();
                 }
             } else {
                 if (isEmergencyMode) {
@@ -76,7 +79,7 @@
         function playNextLayout() { currentLayoutIndex = (currentLayoutIndex + 1) % activeLayouts.length; playCurrentLayout(); }
 
         function playCurrentLayout() {
-            if(activeLayouts.length === 0) return;
+            if(!activeLayouts || activeLayouts.length === 0) return;
             if(fallbackTimer) clearTimeout(fallbackTimer);
             
             const layout = activeLayouts[currentLayoutIndex];
@@ -86,8 +89,7 @@
             const zones = layout.zones || [];
             const mediaZones = zones.filter(z => (!z.type || z.type === 'media') && z.playlist && z.playlist.length > 0);
             const totalMediaZones = mediaZones.length;
-            let zonesCompletedCount = 0;
-            let isLayoutFinished = false;
+            let zonesCompletedCount = 0; let isLayoutFinished = false;
 
             if(totalMediaZones === 0) { fallbackTimer = setTimeout(playNextLayout, 15000); }
 
@@ -107,41 +109,52 @@
                 container.appendChild(zoneDiv);
 
                 if (zone.type === 'clock') {
-                    const cleanup = renderClockZone(zoneDiv); zoneCleanups.push(cleanup);
-                } else if (zone.type === 'marquee') {
-                    zoneDiv.innerHTML = `
-                        <div style="width:100%; height:100%; display:flex; align-items:center; overflow:hidden; white-space:nowrap; color:#fff; font-size: 5vh; background:rgba(0,0,0,0.5);">
-                            <marquee scrollamount="${zone.speed || 5}">${zone.text || '...'}</marquee>
-                        </div>`;
-                } else if (zone.type === 'text') {
-                    zoneDiv.innerHTML = `
-                        <div style="width:100%; height:100%; display:flex; justify-content:center; align-items:center; color:${zone.color || '#ffffff'}; font-size:${zone.fontSize || 40}px; text-align:${zone.textAlign || 'center'}; padding:10px; box-sizing:border-box; word-break:break-word;">
-                            ${zone.text || ''}
-                        </div>`;
-                } else if (!zone.type || zone.type === 'media') {
+                    zoneDiv.innerHTML = `<div style="width:100%; height:100%; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center;"><div class="c-time" style="font-size:${(zone.fontSize || 40)*2}px; color:${zone.color || '#00bcd4'}; font-weight:700; line-height:1; text-shadow:0 0 10px rgba(0,0,0,0.8);">00:00:00</div><div class="c-date" style="font-size:${zone.fontSize || 40}px; color:#fff; text-shadow:0 0 5px #000;">วันที่</div></div>`;
+                    const tEl = zoneDiv.querySelector('.c-time'); const dEl = zoneDiv.querySelector('.c-date');
+                    const uc = () => {
+                        const now = new Date();
+                        tEl.innerText = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                        dEl.innerText = now.toLocaleDateString('th-TH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                    };
+                    uc(); const timer = setInterval(uc, 1000); zoneCleanups.push(() => clearInterval(timer));
+                } 
+                else if (zone.type === 'countdown') {
+                    const target = new Date(zone.targetTime || Date.now()).getTime();
+                    zoneDiv.innerHTML = `<div style="color:${zone.color || '#ff9800'}; font-size:${zone.fontSize || 40}px; font-weight:bold; width:100%; height:100%; display:flex; justify-content:center; align-items:center; text-align:center; text-shadow:0 0 10px #000;"></div>`;
+                    const tEl = zoneDiv.firstElementChild;
+                    const uc = () => {
+                        const diff = target - Date.now();
+                        if(diff <= 0) { tEl.innerText = "00:00:00"; return; }
+                        const d = Math.floor(diff / (1000*60*60*24)); const h = Math.floor((diff / (1000*60*60)) % 24); const m = Math.floor((diff / 1000 / 60) % 60); const s = Math.floor((diff / 1000) % 60);
+                        tEl.innerText = (d > 0 ? d + " วัน " : "") + String(h).padStart(2,'0') + ":" + String(m).padStart(2,'0') + ":" + String(s).padStart(2,'0');
+                    };
+                    uc(); const timer = setInterval(uc, 1000); zoneCleanups.push(() => clearInterval(timer));
+                }
+                else if (zone.type === 'stopwatch') {
+                    const start = zone.startTime || Date.now();
+                    zoneDiv.innerHTML = `<div style="color:${zone.color || '#4caf50'}; font-size:${zone.fontSize || 40}px; font-weight:bold; width:100%; height:100%; display:flex; justify-content:center; align-items:center; text-align:center; text-shadow:0 0 10px #000;"></div>`;
+                    const tEl = zoneDiv.firstElementChild;
+                    const uc = () => {
+                        const diff = Date.now() - start;
+                        const h = Math.floor((diff / (1000*60*60))); const m = Math.floor((diff / 1000 / 60) % 60); const s = Math.floor((diff / 1000) % 60);
+                        tEl.innerText = String(h).padStart(2,'0') + ":" + String(m).padStart(2,'0') + ":" + String(s).padStart(2,'0');
+                    };
+                    uc(); const timer = setInterval(uc, 1000); zoneCleanups.push(() => clearInterval(timer));
+                }
+                else if (zone.type === 'marquee') {
+                    zoneDiv.innerHTML = `<div style="width:100%; height:100%; display:flex; align-items:center; overflow:hidden; white-space:nowrap; color:${zone.color || '#fff'}; font-size:${zone.fontSize || 40}px; background:rgba(0,0,0,0.5);"><marquee scrollamount="${zone.speed || 5}">${zone.text || ''}</marquee></div>`;
+                } 
+                else if (zone.type === 'text') {
+                    zoneDiv.innerHTML = `<div style="width:100%; height:100%; display:flex; justify-content:center; align-items:center; color:${zone.color || '#fff'}; font-size:${zone.fontSize || 40}px; text-align:center; padding:10px; box-sizing:border-box; word-break:break-word; text-shadow:0 0 5px #000;">${zone.text || ''}</div>`;
+                } 
+                else if (!zone.type || zone.type === 'media') {
                     if (zone.playlist && zone.playlist.length > 0) {
-                        zoneDiv.style.background = '#000'; // ให้กรอบสื่อทึบแสง
+                        zoneDiv.style.background = '#000';
                         const cleanup = playZonePlaylist(zoneDiv, zone.playlist, onZoneLoopComplete);
                         zoneCleanups.push(cleanup);
-                    } else {
-                        onZoneLoopComplete();
-                    }
+                    } else { onZoneLoopComplete(); }
                 }
             });
-        }
-
-        function renderClockZone(zoneDiv) {
-            const clockHtml = `<div class="clock-container"><div class="clock-time">00:00:00</div><div class="clock-date">วัน เดือน ปี</div></div>`;
-            zoneDiv.innerHTML = clockHtml;
-            const timeEl = zoneDiv.querySelector('.clock-time'); const dateEl = zoneDiv.querySelector('.clock-date');
-            const updateClock = () => {
-                const now = new Date();
-                timeEl.innerText = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                dateEl.innerText = now.toLocaleDateString('th-TH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-            };
-            updateClock();
-            const timer = setInterval(updateClock, 1000);
-            return () => clearInterval(timer);
         }
 
         function playZonePlaylist(zoneDiv, playlist, onLoopComplete) {
@@ -151,8 +164,7 @@
                     currentElement.classList.remove('active'); currentElement.classList.add('fade-out');
                     setTimeout((el) => { if(el && el.parentNode) el.parentNode.removeChild(el); }, 1000, currentElement);
                 }
-                const item = playlist[currentIndex];
-                let nextElement;
+                const item = playlist[currentIndex]; let nextElement;
 
                 if (item.type === 'video') {
                     nextElement = document.createElement('video');
