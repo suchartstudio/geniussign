@@ -11,9 +11,19 @@
         .zone-media { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: fill; opacity: 0; transition: opacity 1s ease-in-out; }
         .zone-media.active { opacity: 1; z-index: 2; }
         .zone-media.fade-out { opacity: 0; z-index: 1; }
+        
+        /* สไตล์สำหรับปุ่มเริ่มระบบเต็มจอ */
+        #start-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.9); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #fff; }
+        .btn-start { padding: 20px 40px; font-size: 24px; background: #4CAF50; color: #fff; border: none; border-radius: 10px; cursor: pointer; font-family: 'Prompt', sans-serif; transition: transform 0.2s, background 0.2s; font-weight: bold; }
+        .btn-start:hover { background: #45a049; transform: scale(1.05); }
     </style>
 </head>
 <body>
+
+    <div id="start-overlay">
+        <h2 style="margin-bottom: 30px; font-size: 28px;">ระบบ Signage พร้อมทำงาน</h2>
+        <button class="btn-start" onclick="startPlayer()">คลิกเพื่อเริ่มแสดงผล (เต็มจอ & เปิดเสียง)</button>
+    </div>
 
     <div id="player-container">
         <h1 style="color:#555; text-align:center; padding-top: 40vh;">Connecting to Firebase...</h1>
@@ -21,6 +31,21 @@
 
     <script type="module">
         import { db, ref, onValue, set, onDisconnect } from './firebase-config.js';
+
+        // ฟังก์ชันเมื่อผู้ใช้กดปุ่มเข้าสู่ Kiosk Mode
+        window.isAudioUnlocked = false;
+        window.startPlayer = function() {
+            document.getElementById('start-overlay').style.display = 'none';
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen();
+            }
+            window.isAudioUnlocked = true;
+            
+            // สั่งเปิดเสียงให้วิดีโอที่กำลังเล่นอยู่
+            document.querySelectorAll('video').forEach(vid => {
+                vid.muted = false;
+            });
+        }
 
         const urlParams = new URLSearchParams(window.location.search);
         const DISPLAY_ID = urlParams.get('screen') || '01'; 
@@ -35,8 +60,6 @@
         let normalLayouts = []; let normalFont = 'Prompt'; let normalOrientation = 'landscape';
         let activeLayouts = []; let isEmergencyMode = false;
         let currentLayoutIndex = 0; let zoneCleanups = []; let fallbackTimer = null; 
-        
-        let isAudioUnlocked = false;
 
         onValue(ref(db, 'displays/display_' + DISPLAY_ID), (snapshot) => {
             const data = snapshot.val();
@@ -84,7 +107,6 @@
             zoneCleanups.forEach(cleanupFn => cleanupFn());
             zoneCleanups = []; container.innerHTML = ''; 
 
-            // แก้ไขจุดที่พิมพ์ตกหล่นประกาศ const เรียบร้อยแล้วครับ
             const layout = activeLayouts[currentLayoutIndex];
             const zonesList = layout.zones || [];
             const mediaZones = zonesList.filter(z => (!z.type || z.type === 'media') && z.playlist && z.playlist.length > 0);
@@ -118,31 +140,8 @@
                     };
                     uc(); const timer = setInterval(uc, 1000); zoneCleanups.push(() => clearInterval(timer));
                 } 
-                else if (zone.type === 'countdown') {
-                    const target = zone.targetTime || Date.now();
-                    zoneDiv.innerHTML = `<div style="color:${zone.color || '#ff9800'}; font-size:${zone.fontSize || 40}px; font-weight:bold; width:100%; height:100%; display:flex; justify-content:center; align-items:center; text-align:center; text-shadow:0 0 10px #000;"></div>`;
-                    const tEl = zoneDiv.firstElementChild;
-                    const uc = () => {
-                        const diff = target - Date.now();
-                        if(diff <= 0) { tEl.innerText = "00:00:00"; return; }
-                        const h = Math.floor(diff / (1000 * 60 * 60)); const m = Math.floor((diff / (1000 * 60)) % 60); const s = Math.floor((diff / 1000) % 60);
-                        tEl.innerText = String(h).padStart(2,'0') + ":" + String(m).padStart(2,'0') + ":" + String(s).padStart(2,'0');
-                    };
-                    uc(); const timer = setInterval(uc, 1000); zoneCleanups.push(() => clearInterval(timer));
-                }
-                else if (zone.type === 'stopwatch') {
-                    const start = zone.startTime || Date.now();
-                    zoneDiv.innerHTML = `<div style="color:${zone.color || '#4caf50'}; font-size:${zone.fontSize || 40}px; font-weight:bold; width:100%; height:100%; display:flex; justify-content:center; align-items:center; text-align:center; text-shadow:0 0 10px #000;"></div>`;
-                    const tEl = zoneDiv.firstElementChild;
-                    const uc = () => {
-                        const diff = Date.now() - start;
-                        const h = Math.floor((diff / (1000*60*60))); const m = Math.floor((diff / 1000 / 60) % 60); const s = Math.floor((diff / 1000) % 60);
-                        tEl.innerText = String(h).padStart(2,'0') + ":" + String(m).padStart(2,'0') + ":" + String(s).padStart(2,'0');
-                    };
-                    uc(); const timer = setInterval(uc, 1000); zoneCleanups.push(() => clearInterval(timer));
-                }
                 else if (zone.type === 'marquee') {
-                    zoneDiv.innerHTML = `<div style="width:100%; height:100%; display:flex; align-items:center; overflow:hidden; white-space:nowrap; color:${zone.color || '#fff'}; font-size:${zone.fontSize || 40}px; background:rgba(0,0,0,0.5);"><marquee scrollamount="${zone.speed || 5}">${zone.text || ''}</marquee></div>`;
+                    zoneDiv.innerHTML = `<div style="width:100%; height:100%; display:flex; align-items:center; overflow:hidden; white-space:nowrap; color:${zone.color || '#fff'}; font-size:${zone.fontSize || 40}px; background:rgba(0,0,0,0.5);"><marquee scrollamount="5">${zone.text || ''}</marquee></div>`;
                 } 
                 else if (zone.type === 'text') {
                     zoneDiv.innerHTML = `<div style="width:100%; height:100%; display:flex; justify-content:center; align-items:center; color:${zone.color || '#fff'}; font-size:${zone.fontSize || 40}px; text-align:center; padding:10px; box-sizing:border-box; word-break:break-word; text-shadow:0 0 5px #000;">${zone.text || ''}</div>`;
@@ -157,54 +156,30 @@
             });
         }
 
-        function showAudioUnlockButton() {
-            if (document.getElementById('audio-unlock-btn')) return;
-            let btn = document.createElement('button');
-            btn.id = 'audio-unlock-btn';
-            btn.innerHTML = '🔊 หน้าจอปิดเสียงอยู่ คลิกตรงนี้เพื่อเปิดเสียงป้าย';
-            btn.style.cssText = 'position:absolute; top:20px; left:50%; transform:translateX(-50%); z-index:9999; padding:15px 30px; font-size:18px; font-weight:bold; font-family:inherit; background:#4CAF50; color:white; border:none; border-radius:8px; cursor:pointer; text-align:center; box-shadow: 0 4px 15px rgba(0,0,0,0.6);';
-            btn.onclick = (e) => {
-                e.stopPropagation(); isAudioUnlocked = true; btn.remove();
-                document.querySelectorAll('video').forEach(v => { v.muted = false; v.play().catch(e=>console.log(e)); });
-            };
-            document.body.appendChild(btn);
-        }
-
         function playZonePlaylist(zoneDiv, playlist, onLoopComplete) {
-            let currentIndex = 0; let currentElement = null; let zoneTimer = null;
-            let isDestroyed = false; 
-
+            let currentIndex = 0; let currentElement = null; let zoneTimer = null; let isDestroyed = false;
+            
             function showNextMedia() {
-                if (isDestroyed) return; 
-                
                 if (currentElement) {
                     currentElement.classList.remove('active'); currentElement.classList.add('fade-out');
-                    if (currentElement.tagName === 'VIDEO') {
-                        currentElement.pause();
-                        currentElement.muted = true;
-                    }
                     setTimeout((el) => { if(el && el.parentNode) el.parentNode.removeChild(el); }, 1000, currentElement);
                 }
-                
                 const item = playlist[currentIndex]; let nextElement;
 
                 if (item.type === 'video') {
                     nextElement = document.createElement('video');
-                    nextElement.src = item.url; 
-                    nextElement.className = 'zone-media';
-                    nextElement.autoplay = true;
-                    nextElement.playsInline = true;
-                    nextElement.loop = false; 
+                    nextElement.src = item.url; nextElement.className = 'zone-media';
+                    nextElement.autoplay = true; 
                     
-                    nextElement.muted = !isAudioUnlocked;
+                    // ปลดล็อกเสียงเมื่อผู้ใช้กดปุ่มเริ่มระบบแล้ว
+                    nextElement.muted = !window.isAudioUnlocked; 
+                    
+                    nextElement.playsInline = true;
                     nextElement.onended = proceedToNext;
                     nextElement.onerror = () => { zoneTimer = setTimeout(proceedToNext, 1000); };
-                    
-                    if (!isAudioUnlocked) { showAudioUnlockButton(); }
                 } else {
                     nextElement = document.createElement('img');
-                    nextElement.src = item.url; 
-                    nextElement.className = 'zone-media';
+                    nextElement.src = item.url; nextElement.className = 'zone-media';
                     zoneTimer = setTimeout(proceedToNext, 8000);
                 }
 
@@ -242,7 +217,8 @@
                 if (currentElement) {
                     if (currentElement.tagName === 'VIDEO') {
                         currentElement.pause();
-                        currentElement.muted = true;
+                        currentElement.removeAttribute('src'); // เคลียร์ memory
+                        currentElement.load();
                     }
                     if (currentElement.parentNode) currentElement.parentNode.removeChild(currentElement);
                 }
