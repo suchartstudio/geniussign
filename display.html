@@ -123,7 +123,6 @@
                         const diff = target - Date.now();
                         if(diff <= 0) { tEl.innerText = "00:00:00"; return; }
                         
-                        // ปรับการรวมจำนวนวันเป็นชั่วโมงทั้งหมดโดยไม่เอาตัวหนังสือ "วัน"
                         const h = Math.floor(diff / (1000 * 60 * 60)); 
                         const m = Math.floor((diff / (1000 * 60)) % 60); 
                         const s = Math.floor((diff / 1000) % 60);
@@ -161,27 +160,66 @@
 
         function playZonePlaylist(zoneDiv, playlist, onLoopComplete) {
             let currentIndex = 0; let currentElement = null; let zoneTimer = null;
+            
             function showNextMedia() {
                 if (currentElement) {
                     currentElement.classList.remove('active'); currentElement.classList.add('fade-out');
                     setTimeout((el) => { if(el && el.parentNode) el.parentNode.removeChild(el); }, 1000, currentElement);
                 }
+                
                 const item = playlist[currentIndex]; let nextElement;
 
                 if (item.type === 'video') {
                     nextElement = document.createElement('video');
-                    nextElement.src = item.url; nextElement.className = 'zone-media';
-                    nextElement.autoplay = true; nextElement.muted = true; nextElement.playsInline = true;
+                    nextElement.src = item.url; 
+                    nextElement.className = 'zone-media';
+                    nextElement.playsInline = true;
+                    // ไม่ระบุ muted เพื่อให้วิดีโอมีเสียง
+                    
                     nextElement.onended = proceedToNext;
                     nextElement.onerror = () => { zoneTimer = setTimeout(proceedToNext, 1000); };
                 } else {
                     nextElement = document.createElement('img');
-                    nextElement.src = item.url; nextElement.className = 'zone-media';
-                    zoneTimer = setTimeout(proceedToNext, 8000);
+                    nextElement.src = item.url; 
+                    nextElement.className = 'zone-media';
+                    zoneTimer = setTimeout(proceedToNext, 8000); // ระยะเวลาแสดงภาพนิ่ง 8 วินาที
                 }
 
                 zoneDiv.appendChild(nextElement);
-                setTimeout(() => { nextElement.classList.add('active'); }, 50);
+                
+                setTimeout(() => { 
+                    nextElement.classList.add('active'); 
+                    
+                    if (item.type === 'video') {
+                        // สั่งเล่นวิดีโอ และจัดการกรณีเบราว์เซอร์บล็อกเสียง
+                        const playPromise = nextElement.play();
+                        if (playPromise !== undefined) {
+                            playPromise.catch(error => {
+                                console.warn("เบราว์เซอร์บล็อกเสียงวิดีโอ ระบบกำลังทำการเปิดคลิปแบบปิดเสียง (Muted) ชั่วคราว");
+                                nextElement.muted = true; // ยอมปิดเสียงเพื่อให้ภาพวิดีโอสามารถเล่นต่อไปได้
+                                nextElement.play();
+                                
+                                // สร้างปุ่มเตือนขึ้นมากลางจอ
+                                if(!document.getElementById('audio-unlock-btn')) {
+                                    let btn = document.createElement('button');
+                                    btn.id = 'audio-unlock-btn';
+                                    btn.innerHTML = '🔇 เบราว์เซอร์บล็อกเสียง<br>คลิก/แตะ ที่หน้าจอ 1 ครั้งเพื่อเปิดเสียง';
+                                    btn.style.cssText = 'position:absolute; top:20px; left:50%; transform:translateX(-50%); z-index:9999; padding:15px 30px; font-size:18px; font-weight:bold; font-family:Prompt; background:#d32f2f; color:white; border:none; border-radius:8px; cursor:pointer; text-align:center; box-shadow: 0 4px 10px rgba(0,0,0,0.5);';
+                                    document.body.appendChild(btn);
+                                    
+                                    // เมื่อผู้ดูแลระบบเอามือแตะจอ ให้ลบปุ่มทิ้งและปลดล็อกเสียง
+                                    const unlockAudio = () => {
+                                        if(document.getElementById('audio-unlock-btn')) document.getElementById('audio-unlock-btn').remove();
+                                        document.querySelectorAll('video').forEach(v => v.muted = false);
+                                        document.removeEventListener('click', unlockAudio);
+                                    };
+                                    document.addEventListener('click', unlockAudio);
+                                }
+                            });
+                        }
+                    }
+                }, 50);
+                
                 currentElement = nextElement;
             }
 
