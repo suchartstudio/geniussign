@@ -36,7 +36,6 @@
         let activeLayouts = []; let isEmergencyMode = false;
         let currentLayoutIndex = 0; let zoneCleanups = []; let fallbackTimer = null; 
 
-        // 1. รับการตั้งค่าปกติของจอ
         onValue(ref(db, 'displays/display_' + DISPLAY_ID), (snapshot) => {
             const data = snapshot.val();
             if(!data || !data.layouts) return;
@@ -50,14 +49,12 @@
             }
         });
 
-        // 2. รับการตั้งค่าโหมดฉุกเฉิน
         onValue(ref(db, 'global_override'), (snapshot) => {
             const data = snapshot.val();
             if (data && data.isActive) {
                 isEmergencyMode = true;
                 if (data.config) {
                     applyFont(data.config.globalFont || 'Prompt');
-                    // ดึง Layout ฉุกเฉิน ให้ตรงกับแนวจอ (Landscape/Portrait) ของจอนี้อัตโนมัติ
                     const overrideConfig = data.config[normalOrientation] || data.config.landscape;
                     activeLayouts = overrideConfig || []; currentLayoutIndex = 0; playCurrentLayout();
                 }
@@ -119,21 +116,22 @@
                     uc(); const timer = setInterval(uc, 1000); zoneCleanups.push(() => clearInterval(timer));
                 } 
                 else if (zone.type === 'timer') {
-                    const mode = zone.mode || 'up'; // อ่านโหมดจากตั้งค่า (ถ้าไม่มีให้เป็นนับขึ้น)
+                    const mode = zone.mode || 'up'; 
                     zoneDiv.innerHTML = `<div style="color:${zone.color || '#4caf50'}; font-size:${zone.fontSize || 40}px; font-weight:bold; width:100%; height:100%; display:flex; justify-content:center; align-items:center; text-align:center; text-shadow:0 0 10px #000;"></div>`;
                     const tEl = zoneDiv.firstElementChild;
                     
                     if (mode === 'up') {
-                        // โหมดนับขึ้น (Count Up)
-                        const start = zone.startTime || Date.now();
+                        // โหมดนับขึ้น: ถ้าระบุเวลาในช่อง ให้เริ่มนับขึ้นจากเวลานั้น ถ้าไม่ระบุให้เริ่มนับจากเวลาที่กด Deploy
+                        const start = zone.targetTime ? new Date(zone.targetTime).getTime() : (zone.startTime || Date.now());
                         const uc = () => {
                             const diff = Date.now() - start;
-                            const h = Math.floor((diff / (1000*60*60))); const m = Math.floor((diff / 1000 / 60) % 60); const s = Math.floor((diff / 1000) % 60);
-                            tEl.innerText = String(h).padStart(2,'0') + ":" + String(m).padStart(2,'0') + ":" + String(s).padStart(2,'0');
+                            if(diff < 0) { tEl.innerText = "00:00:00"; return; }
+                            const d = Math.floor(diff / (1000*60*60*24)); const h = Math.floor((diff / (1000*60*60)) % 24); const m = Math.floor((diff / 1000 / 60) % 60); const s = Math.floor((diff / 1000) % 60);
+                            tEl.innerText = (d > 0 ? d + " วัน " : "") + String(h).padStart(2,'0') + ":" + String(m).padStart(2,'0') + ":" + String(s).padStart(2,'0');
                         };
                         uc(); const timer = setInterval(uc, 1000); zoneCleanups.push(() => clearInterval(timer));
                     } else {
-                        // โหมดนับถอยหลัง (Count Down)
+                        // โหมดนับถอยหลัง: ถอยหลังลดลงไปหาเวลาเป้าหมายที่เลือกไว้
                         const target = new Date(zone.targetTime || Date.now()).getTime();
                         const uc = () => {
                             const diff = target - Date.now();
