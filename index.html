@@ -36,9 +36,7 @@
         <h1>ระบบควบคุมจอภาพ (Digital Signage Status)</h1>
         <button class="btn-admin" onclick="loginToControl()">เข้าสู่หน้า Control Panel</button>
     </div>
-    
     <div id="emergency-banner">🚨 กำลังถ่ายทอดสดประกาศฉุกเฉินไปยังทุกจอ 🚨</div>
-    
     <div class="grid" id="status-grid"></div>
 
     <script type="module">
@@ -57,9 +55,7 @@
                     <h3>Screen ${id}</h3>
                     <div class="info-row"><span class="info-label">การวางแนว:</span><span id="ori-${id}">...</span></div>
                     <div class="info-row"><span class="info-label">จำนวน Layout:</span><span id="status-${id}">...</span></div>
-                    
                     <button class="btn-view" onclick="window.open('display.html?screen=${id}', '_blank')">เปิดหน้าจอแสดงผล</button>
-                    
                     <div class="conn-status"><div class="status-dot offline" id="dot-${id}"></div><span class="text-offline" id="conn-${id}">ออฟไลน์</span></div>
                 </div>
             `;
