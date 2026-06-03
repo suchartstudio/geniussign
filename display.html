@@ -81,11 +81,11 @@
             if(!activeLayouts || activeLayouts.length === 0) return;
             if(fallbackTimer) clearTimeout(fallbackTimer);
             
-            // เรียกฟังก์ชันเคลียร์สถานะของเก่าอย่างเด็ดขาดก่อนเริ่ม Layout ใหม่
             zoneCleanups.forEach(cleanupFn => cleanupFn());
             zoneCleanups = []; container.innerHTML = ''; 
 
-            const zones = layout = activeLayouts[currentLayoutIndex];
+            // แก้ไขจุดที่พิมพ์ตกหล่นประกาศ const เรียบร้อยแล้วครับ
+            const layout = activeLayouts[currentLayoutIndex];
             const zonesList = layout.zones || [];
             const mediaZones = zonesList.filter(z => (!z.type || z.type === 'media') && z.playlist && z.playlist.length > 0);
             const totalMediaZones = mediaZones.length;
@@ -172,12 +172,11 @@
 
         function playZonePlaylist(zoneDiv, playlist, onLoopComplete) {
             let currentIndex = 0; let currentElement = null; let zoneTimer = null;
-            let isDestroyed = false; // ตัวควบคุมสถานะป้องกันโค้ดรันซ้อนกันเบื้องหลัง
+            let isDestroyed = false; 
 
             function showNextMedia() {
-                if (isDestroyed) return; // หากยกเลิกลูปนี้แล้ว ให้หยุดทำงานทันที
+                if (isDestroyed) return; 
                 
-                // ก่อนจะเคลียร์อันเก่า ให้สั่งหยุดเล่นเสียงและหยุดภาพทันที ป้องกันเสียงค้างตอน Fade-out
                 if (currentElement) {
                     currentElement.classList.remove('active'); currentElement.classList.add('fade-out');
                     if (currentElement.tagName === 'VIDEO') {
@@ -195,7 +194,7 @@
                     nextElement.className = 'zone-media';
                     nextElement.autoplay = true;
                     nextElement.playsInline = true;
-                    nextElement.loop = false; // ปิดการวนซ้ำในตัววิดีโออย่างเด็ดขาด
+                    nextElement.loop = false; 
                     
                     nextElement.muted = !isAudioUnlocked;
                     nextElement.onended = proceedToNext;
@@ -230,14 +229,13 @@
                 if (currentIndex >= playlist.length) { 
                     currentIndex = 0; 
                     onLoopComplete(); 
-                    if (isDestroyed) return; // ถ้าเปลี่ยนหน้าหรือรีรันลูปใหม่จากคำสั่งด้านบน ให้ตัดจบที่ตรงนี้ทันที ไม่สร้างอันซ้อนซ้ำ
+                    if (isDestroyed) return; 
                 }
                 showNextMedia();
             }
 
             showNextMedia();
             
-            // ฟังก์ชัน Cleanup สำหรับทำลายกระบวนการเก่าทิ้งทั้งหมดเมื่อมีการเปลี่ยน Layout
             return () => { 
                 isDestroyed = true; 
                 if(zoneTimer) clearTimeout(zoneTimer); 
