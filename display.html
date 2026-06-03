@@ -35,6 +35,9 @@
         let normalLayouts = []; let normalFont = 'Prompt'; let normalOrientation = 'landscape';
         let activeLayouts = []; let isEmergencyMode = false;
         let currentLayoutIndex = 0; let zoneCleanups = []; let fallbackTimer = null; 
+        
+        // ตัวแปรส่วนกลางสำหรับจำสถานะว่า หน้าจอนี้ได้รับการอนุญาตให้เปิดเสียงหรือยัง
+        let isAudioUnlocked = false;
 
         onValue(ref(db, 'displays/display_' + DISPLAY_ID), (snapshot) => {
             const data = snapshot.val();
@@ -158,6 +161,29 @@
             });
         }
 
+        // ฟังก์ชันสร้างปุ่มปลดล็อกเสียงแบบปลอดภัย
+        function showAudioUnlockButton() {
+            if (document.getElementById('audio-unlock-btn')) return;
+            
+            let btn = document.createElement('button');
+            btn.id = 'audio-unlock-btn';
+            btn.innerHTML = '🔊 หน้าจอปิดเสียงอยู่ คลิกตรงนี้เพื่อเปิดเสียงป้าย';
+            btn.style.cssText = 'position:absolute; top:20px; left:50%; transform:translateX(-50%); z-index:9999; padding:15px 30px; font-size:18px; font-weight:bold; font-family:inherit; background:#4CAF50; color:white; border:none; border-radius:8px; cursor:pointer; text-align:center; box-shadow: 0 4px 15px rgba(0,0,0,0.6);';
+            
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                isAudioUnlocked = true; // บันทึกว่าถูกปลดล็อกแล้วสิทธิ์เว็บทำงานสมบูรณ์
+                btn.remove(); // ลบปุ่มทิ้งอย่างถาวร
+                
+                // ปลดล็อกเสียงวิดีโอทั้งหมดที่เล่นอยู่ ณ วินาทีนั้นทันที
+                document.querySelectorAll('video').forEach(v => {
+                    v.muted = false;
+                    v.play().catch(err => console.log(err));
+                });
+            };
+            document.body.appendChild(btn);
+        }
+
         function playZonePlaylist(zoneDiv, playlist, onLoopComplete) {
             let currentIndex = 0; let currentElement = null; let zoneTimer = null;
             
@@ -173,50 +199,36 @@
                     nextElement = document.createElement('video');
                     nextElement.src = item.url; 
                     nextElement.className = 'zone-media';
+                    nextElement.autoplay = true;
                     nextElement.playsInline = true;
-                    // ไม่ระบุ muted เพื่อให้วิดีโอมีเสียง
+                    
+                    // หากยังไม่กดปลดล็อก ให้บังคับ Muted ไว้ก่อน เพื่อให้ภาพขึ้น 100% ป้องกันจอดำ
+                    nextElement.muted = !isAudioUnlocked;
                     
                     nextElement.onended = proceedToNext;
                     nextElement.onerror = () => { zoneTimer = setTimeout(proceedToNext, 1000); };
+                    
+                    // ตรวจสอบเรียกปุ่มปลดล็อกเสียงถ้ายังไม่ได้กด
+                    if (!isAudioUnlocked) {
+                        showAudioUnlockButton();
+                    }
                 } else {
                     nextElement = document.createElement('img');
                     nextElement.src = item.url; 
                     nextElement.className = 'zone-media';
-                    zoneTimer = setTimeout(proceedToNext, 8000); // ระยะเวลาแสดงภาพนิ่ง 8 วินาที
+                    zoneTimer = setTimeout(proceedToNext, 8000);
                 }
 
                 zoneDiv.appendChild(nextElement);
                 
                 setTimeout(() => { 
                     nextElement.classList.add('active'); 
-                    
                     if (item.type === 'video') {
-                        // สั่งเล่นวิดีโอ และจัดการกรณีเบราว์เซอร์บล็อกเสียง
-                        const playPromise = nextElement.play();
-                        if (playPromise !== undefined) {
-                            playPromise.catch(error => {
-                                console.warn("เบราว์เซอร์บล็อกเสียงวิดีโอ ระบบกำลังทำการเปิดคลิปแบบปิดเสียง (Muted) ชั่วคราว");
-                                nextElement.muted = true; // ยอมปิดเสียงเพื่อให้ภาพวิดีโอสามารถเล่นต่อไปได้
-                                nextElement.play();
-                                
-                                // สร้างปุ่มเตือนขึ้นมากลางจอ
-                                if(!document.getElementById('audio-unlock-btn')) {
-                                    let btn = document.createElement('button');
-                                    btn.id = 'audio-unlock-btn';
-                                    btn.innerHTML = '🔇 เบราว์เซอร์บล็อกเสียง<br>คลิก/แตะ ที่หน้าจอ 1 ครั้งเพื่อเปิดเสียง';
-                                    btn.style.cssText = 'position:absolute; top:20px; left:50%; transform:translateX(-50%); z-index:9999; padding:15px 30px; font-size:18px; font-weight:bold; font-family:Prompt; background:#d32f2f; color:white; border:none; border-radius:8px; cursor:pointer; text-align:center; box-shadow: 0 4px 10px rgba(0,0,0,0.5);';
-                                    document.body.appendChild(btn);
-                                    
-                                    // เมื่อผู้ดูแลระบบเอามือแตะจอ ให้ลบปุ่มทิ้งและปลดล็อกเสียง
-                                    const unlockAudio = () => {
-                                        if(document.getElementById('audio-unlock-btn')) document.getElementById('audio-unlock-btn').remove();
-                                        document.querySelectorAll('video').forEach(v => v.muted = false);
-                                        document.removeEventListener('click', unlockAudio);
-                                    };
-                                    document.addEventListener('click', unlockAudio);
-                                }
-                            });
-                        }
+                        nextElement.play().catch(error => {
+                            console.warn("Autoplay block protection triggered:", error);
+                            nextElement.muted = true;
+                            nextElement.play().catch(e => console.error(e));
+                        });
                     }
                 }, 50);
                 
