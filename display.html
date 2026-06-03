@@ -35,8 +35,9 @@
         let normalLayouts = []; let normalFont = 'Prompt'; let normalOrientation = 'landscape';
         let activeLayouts = []; let isEmergencyMode = false;
         let currentLayoutIndex = 0; let zoneCleanups = []; let fallbackTimer = null; 
+        
+        let isAudioUnlocked = false;
 
-        // 1. รับการตั้งค่าปกติของจอ
         onValue(ref(db, 'displays/display_' + DISPLAY_ID), (snapshot) => {
             const data = snapshot.val();
             if(!data || !data.layouts) return;
@@ -50,7 +51,6 @@
             }
         });
 
-        // 2. รับการตั้งค่าโหมดฉุกเฉิน
         onValue(ref(db, 'global_override'), (snapshot) => {
             const data = snapshot.val();
             if (data && data.isActive) {
@@ -81,12 +81,13 @@
             if(!activeLayouts || activeLayouts.length === 0) return;
             if(fallbackTimer) clearTimeout(fallbackTimer);
             
-            const layout = activeLayouts[currentLayoutIndex];
             zoneCleanups.forEach(cleanupFn => cleanupFn());
             zoneCleanups = []; container.innerHTML = ''; 
 
-            const zones = layout.zones || [];
-            const mediaZones = zones.filter(z => (!z.type || z.type === 'media') && z.playlist && z.playlist.length > 0);
+            // แก้ไขจุดที่พิมพ์ตกหล่นประกาศ const เรียบร้อยแล้วครับ
+            const layout = activeLayouts[currentLayoutIndex];
+            const zonesList = layout.zones || [];
+            const mediaZones = zonesList.filter(z => (!z.type || z.type === 'media') && z.playlist && z.playlist.length > 0);
             const totalMediaZones = mediaZones.length;
             let zonesCompletedCount = 0; let isLayoutFinished = false;
 
@@ -100,7 +101,7 @@
                 }
             }
 
-            zones.forEach(zone => {
+            zonesList.forEach(zone => {
                 const zoneDiv = document.createElement('div');
                 zoneDiv.className = 'zone-element';
                 zoneDiv.style.top = zone.top + '%'; zoneDiv.style.left = zone.left + '%';
@@ -118,14 +119,14 @@
                     uc(); const timer = setInterval(uc, 1000); zoneCleanups.push(() => clearInterval(timer));
                 } 
                 else if (zone.type === 'countdown') {
-                    const target = new Date(zone.targetTime || Date.now()).getTime();
+                    const target = zone.targetTime || Date.now();
                     zoneDiv.innerHTML = `<div style="color:${zone.color || '#ff9800'}; font-size:${zone.fontSize || 40}px; font-weight:bold; width:100%; height:100%; display:flex; justify-content:center; align-items:center; text-align:center; text-shadow:0 0 10px #000;"></div>`;
                     const tEl = zoneDiv.firstElementChild;
                     const uc = () => {
                         const diff = target - Date.now();
                         if(diff <= 0) { tEl.innerText = "00:00:00"; return; }
-                        const d = Math.floor(diff / (1000*60*60*24)); const h = Math.floor((diff / (1000*60*60)) % 24); const m = Math.floor((diff / 1000 / 60) % 60); const s = Math.floor((diff / 1000) % 60);
-                        tEl.innerText = (d > 0 ? d + " วัน " : "") + String(h).padStart(2,'0') + ":" + String(m).padStart(2,'0') + ":" + String(s).padStart(2,'0');
+                        const h = Math.floor(diff / (1000 * 60 * 60)); const m = Math.floor((diff / (1000 * 60)) % 60); const s = Math.floor((diff / 1000) % 60);
+                        tEl.innerText = String(h).padStart(2,'0') + ":" + String(m).padStart(2,'0') + ":" + String(s).padStart(2,'0');
                     };
                     uc(); const timer = setInterval(uc, 1000); zoneCleanups.push(() => clearInterval(timer));
                 }
@@ -156,43 +157,96 @@
             });
         }
 
+        function showAudioUnlockButton() {
+            if (document.getElementById('audio-unlock-btn')) return;
+            let btn = document.createElement('button');
+            btn.id = 'audio-unlock-btn';
+            btn.innerHTML = '🔊 หน้าจอปิดเสียงอยู่ คลิกตรงนี้เพื่อเปิดเสียงป้าย';
+            btn.style.cssText = 'position:absolute; top:20px; left:50%; transform:translateX(-50%); z-index:9999; padding:15px 30px; font-size:18px; font-weight:bold; font-family:inherit; background:#4CAF50; color:white; border:none; border-radius:8px; cursor:pointer; text-align:center; box-shadow: 0 4px 15px rgba(0,0,0,0.6);';
+            btn.onclick = (e) => {
+                e.stopPropagation(); isAudioUnlocked = true; btn.remove();
+                document.querySelectorAll('video').forEach(v => { v.muted = false; v.play().catch(e=>console.log(e)); });
+            };
+            document.body.appendChild(btn);
+        }
+
         function playZonePlaylist(zoneDiv, playlist, onLoopComplete) {
             let currentIndex = 0; let currentElement = null; let zoneTimer = null;
+            let isDestroyed = false; 
+
             function showNextMedia() {
+                if (isDestroyed) return; 
+                
                 if (currentElement) {
                     currentElement.classList.remove('active'); currentElement.classList.add('fade-out');
+                    if (currentElement.tagName === 'VIDEO') {
+                        currentElement.pause();
+                        currentElement.muted = true;
+                    }
                     setTimeout((el) => { if(el && el.parentNode) el.parentNode.removeChild(el); }, 1000, currentElement);
                 }
+                
                 const item = playlist[currentIndex]; let nextElement;
 
                 if (item.type === 'video') {
                     nextElement = document.createElement('video');
-                    nextElement.src = item.url; nextElement.className = 'zone-media';
-                    nextElement.autoplay = true; nextElement.muted = true; nextElement.playsInline = true;
+                    nextElement.src = item.url; 
+                    nextElement.className = 'zone-media';
+                    nextElement.autoplay = true;
+                    nextElement.playsInline = true;
+                    nextElement.loop = false; 
+                    
+                    nextElement.muted = !isAudioUnlocked;
                     nextElement.onended = proceedToNext;
                     nextElement.onerror = () => { zoneTimer = setTimeout(proceedToNext, 1000); };
+                    
+                    if (!isAudioUnlocked) { showAudioUnlockButton(); }
                 } else {
                     nextElement = document.createElement('img');
-                    nextElement.src = item.url; nextElement.className = 'zone-media';
-                    
-                    // ดึงเวลาการแสดงผลที่ผู้ใช้ตั้งค่าไว้ (หากไม่มี จะใช้ค่าเริ่มต้น 8 วินาที)
-                    const imageDuration = (item.duration || 8) * 1000;
-                    zoneTimer = setTimeout(proceedToNext, imageDuration);
+                    nextElement.src = item.url; 
+                    nextElement.className = 'zone-media';
+                    zoneTimer = setTimeout(proceedToNext, 8000);
                 }
 
                 zoneDiv.appendChild(nextElement);
-                setTimeout(() => { nextElement.classList.add('active'); }, 50);
+                
+                setTimeout(() => { 
+                    if (isDestroyed) return;
+                    nextElement.classList.add('active'); 
+                    if (item.type === 'video') {
+                        nextElement.play().catch(error => {
+                            nextElement.muted = true; nextElement.play().catch(e => console.error(e));
+                        });
+                    }
+                }, 50);
+                
                 currentElement = nextElement;
             }
 
             function proceedToNext() {
+                if (isDestroyed) return;
                 currentIndex++;
-                if (currentIndex >= playlist.length) { currentIndex = 0; onLoopComplete(); }
+                if (currentIndex >= playlist.length) { 
+                    currentIndex = 0; 
+                    onLoopComplete(); 
+                    if (isDestroyed) return; 
+                }
                 showNextMedia();
             }
 
             showNextMedia();
-            return () => { if(zoneTimer) clearTimeout(zoneTimer); };
+            
+            return () => { 
+                isDestroyed = true; 
+                if(zoneTimer) clearTimeout(zoneTimer); 
+                if (currentElement) {
+                    if (currentElement.tagName === 'VIDEO') {
+                        currentElement.pause();
+                        currentElement.muted = true;
+                    }
+                    if (currentElement.parentNode) currentElement.parentNode.removeChild(currentElement);
+                }
+            };
         }
     </script>
 </body>
