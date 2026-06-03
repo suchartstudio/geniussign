@@ -36,7 +36,6 @@
         let activeLayouts = []; let isEmergencyMode = false;
         let currentLayoutIndex = 0; let zoneCleanups = []; let fallbackTimer = null; 
 
-        // 1. รับการตั้งค่าปกติของจอ
         onValue(ref(db, 'displays/display_' + DISPLAY_ID), (snapshot) => {
             const data = snapshot.val();
             if(!data || !data.layouts) return;
@@ -50,7 +49,6 @@
             }
         });
 
-        // 2. รับการตั้งค่าโหมดฉุกเฉิน
         onValue(ref(db, 'global_override'), (snapshot) => {
             const data = snapshot.val();
             if (data && data.isActive) {
@@ -108,12 +106,13 @@
                 container.appendChild(zoneDiv);
 
                 if (zone.type === 'clock') {
-                    zoneDiv.innerHTML = `<div style="width:100%; height:100%; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center;"><div class="c-time" style="font-size:${(zone.fontSize || 40)*2}px; color:${zone.color || '#00bcd4'}; font-weight:700; line-height:1; text-shadow:0 0 10px rgba(0,0,0,0.8);">00:00:00</div><div class="c-date" style="font-size:${zone.fontSize || 40}px; color:#fff; text-shadow:0 0 5px #000;">วันที่</div></div>`;
-                    const tEl = zoneDiv.querySelector('.c-time'); const dEl = zoneDiv.querySelector('.c-date');
+                    // แก้ไขตรงนี้: เอาวินาที และ บล็อกแสดงผลวันที่ออก เหลือเฉพาะชั่วโมงกับนาที
+                    zoneDiv.innerHTML = `<div style="width:100%; height:100%; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center;"><div class="c-time" style="font-size:${(zone.fontSize || 40)*2}px; color:${zone.color || '#00bcd4'}; font-weight:700; line-height:1; text-shadow:0 0 10px rgba(0,0,0,0.8);">00:00</div></div>`;
+                    const tEl = zoneDiv.querySelector('.c-time');
                     const uc = () => {
                         const now = new Date();
-                        tEl.innerText = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                        dEl.innerText = now.toLocaleDateString('th-TH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                        // กำหนดให้ออกเฉพาะชั่วโมงและนาที (hour: 2-digit, minute: 2-digit)
+                        tEl.innerText = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
                     };
                     uc(); const timer = setInterval(uc, 1000); zoneCleanups.push(() => clearInterval(timer));
                 } 
@@ -174,10 +173,7 @@
                 } else {
                     nextElement = document.createElement('img');
                     nextElement.src = item.url; nextElement.className = 'zone-media';
-                    
-                    // ดึงเวลาการแสดงผลที่ผู้ใช้ตั้งค่าไว้ (หากไม่มี จะใช้ค่าเริ่มต้น 8 วินาที)
-                    const imageDuration = (item.duration || 8) * 1000;
-                    zoneTimer = setTimeout(proceedToNext, imageDuration);
+                    zoneTimer = setTimeout(proceedToNext, 8000);
                 }
 
                 zoneDiv.appendChild(nextElement);
