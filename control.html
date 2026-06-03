@@ -54,7 +54,7 @@
             <option value="05">Screen 05</option> <option value="06">Screen 06</option>
             <option value="07">Screen 07</option> <option value="08">Screen 08</option>
             <option value="09">Screen 09</option> <option value="10">Screen 10</option>
-            <option value="GLOBAL" style="background: #d32f2f; color: #fff;">🚨 ประกาศฉุกเฉิน (ทุกจอ)</option>
+            <option value="11">Screen 11</option> <option value="12">Screen 12</option> <option value="GLOBAL" style="background: #d32f2f; color: #fff;">🚨 ประกาศฉุกเฉิน (ทุกจอ)</option>
         </select>
         
         <label>ออกแบบสำหรับ (แนวจอพรีวิว):</label>
@@ -128,7 +128,6 @@
             document.getElementById('dynamic-font').href = fontUrl; document.body.style.fontFamily = `'${globalFont}', sans-serif`;
         }
 
-        // --- คลังสื่อ ---
         onValue(ref(db, 'media_library'), (snapshot) => {
             const mediaData = snapshot.val();
             const list = document.getElementById('media-list'); list.innerHTML = '';
@@ -165,7 +164,6 @@
         window.renameMedia = function(k, n) { const n2 = prompt("แก้ไขชื่อไฟล์:", n); if(n2 && n2.trim() !== '') update(ref(db, 'media_library/' + k), { name: n2 }); }
         window.deleteMedia = async function(k, p) { if(confirm("ลบไฟล์นี้ถาวร?")) { try { await deleteObject(storageRef(storage, p)); await remove(ref(db, 'media_library/' + k)); } catch(e){} } }
 
-        // --- โหลดข้อมูล ---
         window.loadData = function() {
             currentScreen = document.getElementById('screen-select').value;
             if(currentScreen === 'GLOBAL') {
@@ -219,7 +217,6 @@
             renderCanvas();
         }
 
-        // Functions สร้าง Zone
         window.addZone = function() { layouts[activeLayoutIndex].zones.push({ id: Date.now(), top: 10, left: 10, width: 40, height: 40, type: 'media', playlist: [] }); renderCanvas(); }
         window.addClockZone = function() { layouts[activeLayoutIndex].zones.push({ id: Date.now(), top: 10, left: 10, width: 30, height: 20, type: 'clock', fontSize: 40, color: '#00bcd4' }); renderCanvas(); }
         window.addMarqueeZone = function() { layouts[activeLayoutIndex].zones.push({ id: Date.now(), top: 10, left: 10, width: 60, height: 15, type: 'marquee', text: 'ตัววิ่ง...', speed: 5, fontSize: 30, color: '#ffffff' }); renderCanvas(); }
@@ -231,13 +228,6 @@
         window.removeMediaFromZone = function(zIdx, mIdx) { layouts[activeLayoutIndex].zones[zIdx].playlist.splice(mIdx, 1); renderCanvas(); }
         window.updateZoneProp = function(zoneIndex, prop, value) { layouts[activeLayoutIndex].zones[zoneIndex][prop] = value; }
 
-        // ฟังก์ชันใหม่สำหรับบันทึกเวลาแสดงผลของไฟล์ภาพใน Playlist
-        window.updateMediaDuration = function(zoneIndex, mediaIndex, value) {
-            let sec = parseInt(value);
-            if (isNaN(sec) || sec < 1) sec = 1;
-            layouts[activeLayoutIndex].zones[zoneIndex].playlist[mediaIndex].duration = sec;
-        }
-
         function renderCanvas() {
             const canvas = document.getElementById('canvas'); canvas.innerHTML = '';
             const zones = layouts[activeLayoutIndex].zones || [];
@@ -248,8 +238,9 @@
                 
                 let innerContent = '';
                 
+                // แก้ไขจุดบกพร่อง: เพิ่ม onmouseup="event.stopPropagation();" เพื่อป้องกันระบบรีเรนเดอร์ขัดจังหวะตอนผู้ใช้กรอกข้อความ
                 const renderTools = (showText, showTarget) => `
-                    <div style="padding:10px; width:100%; box-sizing: border-box; display:flex; flex-direction:column; gap:5px; pointer-events:auto; z-index:20;" onmousedown="event.stopPropagation();">
+                    <div style="padding:10px; width:100%; box-sizing: border-box; display:flex; flex-direction:column; gap:5px; pointer-events:auto; z-index:20;" onmousedown="event.stopPropagation();" onmouseup="event.stopPropagation();">
                         ${showText ? `<input type="text" class="inline-input" value="${zone.text || ''}" placeholder="ระบุข้อความ" onchange="updateZoneProp(${index}, 'text', this.value); renderCanvas();">` : ''}
                         ${showTarget ? `<input type="datetime-local" class="inline-input" value="${zone.targetTime || ''}" onchange="updateZoneProp(${index}, 'targetTime', this.value); renderCanvas();">` : ''}
                         <div class="prop-row">
@@ -263,43 +254,10 @@
                 if (zone.type === 'media') {
                     if (!zone.playlist) zone.playlist = [];
                     el.ondragover = (e) => e.preventDefault();
-                    // กำหนดค่าเริ่มต้นเวลาของรูปภาพไว้ที่ 8 วินาทีเมื่อลากมาวางใหม่
-                    el.ondrop = (e) => { 
-                        e.preventDefault(); 
-                        zone.playlist.push({ 
-                            url: e.dataTransfer.getData('mediaUrl'), 
-                            type: e.dataTransfer.getData('mediaType'), 
-                            name: e.dataTransfer.getData('mediaName') || 'ไฟล์สื่อ',
-                            duration: 8 
-                        }); 
-                        renderCanvas(); 
-                    };
+                    el.ondrop = (e) => { e.preventDefault(); zone.playlist.push({ url: e.dataTransfer.getData('mediaUrl'), type: e.dataTransfer.getData('mediaType'), name: e.dataTransfer.getData('mediaName') || 'ไฟล์สื่อ' }); renderCanvas(); };
                     let bgPreview = '';
                     if(zone.playlist.length > 0) bgPreview = zone.playlist[0].type === 'video' ? `<video src="${zone.playlist[0].url}" autoplay loop muted></video>` : `<img src="${zone.playlist[0].url}">`;
-                    
-                    // ปรับปรุง UI รายชื่อไฟล์: เพิ่มกล่องใส่ตัวเลขวินาทีให้กับรูปภาพ
-                    let playlistHtml = zone.playlist.map((item, i) => {
-                        let durationControls = '';
-                        if (item.type === 'image') {
-                            durationControls = `
-                                <div style="display: flex; align-items: center; gap: 2px; margin-left: auto; margin-right: 5px;">
-                                    <input type="number" value="${item.duration || 8}" min="1" max="3600" 
-                                           style="width: 40px; padding: 2px; background: #222; color: #fff; border: 1px solid #666; text-align: center; font-size: 10px; border-radius: 3px;" 
-                                           onmousedown="event.stopPropagation();" 
-                                           onchange="updateMediaDuration(${index}, ${i}, this.value)">
-                                    <span style="font-size: 10px; color: #aaa;">วิ</span>
-                                </div>`;
-                        }
-                        return `
-                            <div class="zone-media-list-item" style="display: flex; align-items: center; width: 100%; box-sizing: border-box;">
-                                <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex-grow: 1; max-width: 110px;" title="${item.name}">
-                                    ${item.type==='video'?'🎥':'🖼️'} ${item.name}
-                                </span>
-                                ${durationControls}
-                                <button onmousedown="event.stopPropagation(); removeMediaFromZone(${index}, ${i})" title="ลบไฟล์นี้">❌</button>
-                            </div>`;
-                    }).join('');
-                    
+                    let playlistHtml = zone.playlist.map((item, i) => `<div class="zone-media-list-item"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${item.type==='video'?'🎥':'🖼️'} ${item.name}</span><button onmousedown="event.stopPropagation(); removeMediaFromZone(${index}, ${i})" title="ลบไฟล์นี้">❌</button></div>`).join('');
                     innerContent = `${bgPreview}<div class="zone-playlist-ui">${zone.playlist.length === 0 ? '<div style="color:#fff; text-align:center; font-size:12px; margin-top:20px;">ลากไฟล์มาวาง</div>' : playlistHtml}</div>`;
                 } else if (zone.type === 'clock') { 
                     innerContent = `<div style="text-align:center; color:#888; font-size:12px; position:absolute; top:5px; width:100%;">พรีวิวตั้งค่านาฬิกา</div>` + renderTools(false, false);
