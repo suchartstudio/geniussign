@@ -3,28 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <title>Signage Pro Controller</title>
-    <link id="dynamic-font" href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link id="dynamic-font" href="" rel="stylesheet">
     <style>
-        body { font-family: 'Prompt', sans-serif; background: #1e1e1e; color: #fff; margin: 0; display: flex; height: 100vh; overflow: hidden; transition: all 0.3s; border-top: 5px solid transparent; }
+        /* บังคับทั้งระบบหลังบ้านใช้ Chakra Petch */
+        body { font-family: 'Chakra Petch', sans-serif; background: #1e1e1e; color: #fff; margin: 0; display: flex; height: 100vh; overflow: hidden; transition: all 0.3s; border-top: 5px solid transparent; }
         
         .sidebar-left { width: 340px; background: #2d2d2d; padding: 20px; overflow-y: auto; border-right: 1px solid #444; flex-shrink: 0; display: flex; flex-direction: column; }
         .main-workspace { flex-grow: 1; padding: 20px; display: flex; flex-direction: column; overflow-y: auto; background: #1a1a1a; }
         .sidebar-right { width: 320px; background: #2d2d2d; padding: 20px; overflow-y: auto; border-left: 1px solid #444; flex-shrink: 0; }
         
-        h3 { color: #4CAF50; margin-top: 0; border-bottom: 1px solid #444; padding-bottom: 10px; }
-        label { display: block; margin-top: 15px; font-size: 14px; color: #aaa; }
-        button, select, input { font-family: inherit; width: 100%; padding: 8px; margin-top: 5px; background: #3d3d3d; color: white; border: 1px solid #555; border-radius: 4px; cursor: pointer; box-sizing: border-box; }
+        h3 { color: #4CAF50; margin-top: 0; border-bottom: 1px solid #444; padding-bottom: 10px; font-size: 20px; }
+        label { display: block; margin-top: 15px; font-size: 15px; color: #bbb; }
+        button, select, input { font-family: 'Chakra Petch', sans-serif; width: 100%; padding: 8px; margin-top: 5px; background: #3d3d3d; color: white; border: 1px solid #555; border-radius: 4px; cursor: pointer; box-sizing: border-box; font-size: 15px; }
         button.primary { background: #0078D7; font-weight: bold; } button.primary:hover { background: #005A9E; }
         
-        .media-item { background: #444; padding: 8px; margin-top: 8px; border-radius: 4px; display: flex; align-items: center; gap: 10px; font-size: 12px; }
+        .media-item { background: #444; padding: 8px; margin-top: 8px; border-radius: 4px; display: flex; align-items: center; gap: 10px; font-size: 13px; }
         .media-thumb { width: 40px; height: 40px; object-fit: cover; background: #000; flex-shrink: 0; cursor: grab; }
         .media-info { flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .media-actions button { width: auto; padding: 4px 8px; margin: 0; font-size: 10px; }
+        .media-actions button { width: auto; padding: 4px 8px; margin: 0; font-size: 12px; }
         .btn-del { background: #d32f2f; } .btn-del:hover { background: #b71c1c; }
 
         .canvas-wrapper { background: #000; position: relative; margin: 20px auto; border: 2px solid #555; box-shadow: 0 10px 30px rgba(0,0,0,0.5); background-image: linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px); background-size: 5% 5%; overflow: hidden; }
         .zone-box { position: absolute; border: 2px solid #4CAF50; resize: both; overflow: hidden; display: flex; flex-direction: column; background: rgba(17,17,17,0.8); }
-        .zone-header { background: #4CAF50; color: #000; width: 100%; font-size: 12px; font-weight: bold; cursor: move; padding: 4px 0; text-align: center; position: relative; z-index: 100; display: flex; justify-content: space-between; align-items: center; padding: 4px 8px; box-sizing: border-box; }
+        
+        /* ปรับ Zone Header ให้บางลง และปุ่มเล็กลง */
+        .zone-header { background: rgba(76, 175, 80, 0.9); color: #000; width: 100%; font-size: 10px; font-weight: bold; cursor: move; padding: 2px 4px; text-align: center; position: relative; z-index: 100; display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; flex-shrink: 0; height: 20px; }
         .zone-content { flex-grow: 1; width: 100%; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; background: transparent; overflow: hidden; pointer-events: none; }
         .zone-content img, .zone-content video { width: 100%; height: 100%; object-fit: fill; position: absolute; top:0; left:0; opacity: 0.4; }
         
@@ -32,17 +36,15 @@
         .zone-media-list-item { background: rgba(0,0,0,0.8); border: 1px solid #555; padding: 4px 8px; margin-bottom: 4px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; font-size: 11px; }
         .zone-media-list-item button { width: auto; background: none; border: none; padding: 0; margin: 0; font-size: 12px; }
         
-        /* ปุ่มจัดการ Layer */
-        .btn-layer { background: rgba(0,0,0,0.3); color: #000; border: none; padding: 2px 6px; border-radius: 3px; cursor: pointer; font-size: 10px; margin-left: 2px; pointer-events: auto; }
+        .btn-layer { background: rgba(0,0,0,0.3); color: #000; border: none; padding: 1px 4px; border-radius: 3px; cursor: pointer; font-size: 9px; margin-left: 2px; pointer-events: auto; }
         .btn-layer:hover { background: rgba(0,0,0,0.6); color: #fff; }
-        .btn-delete-zone { background: #d32f2f; color: white; border: none; font-weight: bold; cursor: pointer; padding: 2px 8px; border-radius: 4px; width: auto; font-size: 10px; pointer-events: auto; margin-left: 5px; }
+        .btn-delete-zone { background: #d32f2f; color: white; border: none; font-weight: bold; cursor: pointer; padding: 1px 4px; border-radius: 3px; width: auto; font-size: 9px; pointer-events: auto; margin-left: 5px; }
 
         .layout-tabs { display: flex; gap: 5px; margin-bottom: 10px; flex-wrap: wrap; }
         .tab { padding: 8px 15px; background: #333; border-radius: 4px; cursor: pointer; }
         .tab.active { background: #4CAF50; color: #000; font-weight: bold; }
         
-        .inline-input { background:#000; border:1px solid #555; color:#fff; width:100%; margin-bottom:5px; padding: 6px; border-radius:4px; font-family: inherit; }
-        .prop-row { display:flex; gap:10px; width: 100%; align-items: center; margin-top:5px; flex-wrap: wrap; }
+        .inline-input { background:#000; border:1px solid #555; color:#fff; width:100%; margin-bottom:10px; padding: 8px; border-radius:4px; font-family: inherit; font-size: 15px; }
     </style>
     <script>if (sessionStorage.getItem('isAdmin') !== 'true') window.location.href = 'index.html';</script>
 </head>
@@ -68,7 +70,7 @@
         </select>
         <small id="global-helper" style="display:none; color:#ff9800; margin-top:5px;">*ในโหมดฉุกเฉิน ควรสร้างทั้งแนวนอนและแนวตั้ง</small>
 
-        <label>แบบอักษร (Google Fonts):</label>
+        <label>แบบอักษรสำหรับหน้าจอแสดงผล:</label>
         <select id="font-select" onchange="changeGlobalFont()">
             <option value="Prompt">Prompt (พร้อม)</option>
             <option value="Kanit">Kanit (คณิต)</option>
@@ -79,15 +81,16 @@
         </select>
 
         <div id="zone-editors-wrapper" style="display:none; margin-top:20px; border-top:1px solid #444; padding-top:15px; flex-grow:1;">
-            <div id="zone-editors-container"></div>
+            <h3 style="color:#ff9800; font-size:18px; margin-bottom:10px;">📝 แก้ไขข้อความในจอ</h3>
+            <div id="zone-editors-container" style="display: flex; flex-direction: column; gap: 15px;"></div>
         </div>
 
         <div id="btn-normal-mode">
-            <button onclick="saveDeploy()" class="primary" style="margin-top: 40px; padding: 15px; background: #4CAF50; font-size:16px;">บันทึก & ส่งขึ้นจอ</button>
+            <button onclick="saveDeploy()" class="primary" style="margin-top: 40px; padding: 15px; background: #4CAF50; font-size:18px;">บันทึก & ส่งขึ้นจอ</button>
         </div>
 
         <div id="btn-emergency-mode" style="display:none; margin-top: 40px;">
-            <button onclick="startEmergency()" style="padding: 15px; background: #d32f2f; color: white; font-weight: bold; font-size:16px; border:none; border-radius:4px; cursor:pointer;">🚨 ถ่ายทอดสด (ทุกจอทันที)</button>
+            <button onclick="startEmergency()" style="padding: 15px; background: #d32f2f; color: white; font-weight: bold; font-size:18px; border:none; border-radius:4px; cursor:pointer;">🚨 ถ่ายทอดสด (ทุกจอทันที)</button>
             <button onclick="stopEmergency()" style="padding: 10px; background: #333; color: white; font-weight: bold; border:none; border-radius:4px; cursor:pointer; margin-top:10px;">🛑 ยกเลิกการประกาศ</button>
         </div>
         <button onclick="logout()" style="background: #333; margin-top:10px;">ออกจากระบบ</button>
@@ -128,10 +131,13 @@
         let activeLayoutIndex = 0;
 
         window.logout = function() { sessionStorage.removeItem('isAdmin'); window.location.href = 'index.html'; }
+        
         window.changeGlobalFont = function() {
             globalFont = document.getElementById('font-select').value;
             const fontUrl = `https://fonts.googleapis.com/css2?family=${globalFont.replace(/ /g, '+')}:wght@300;400;500;700&display=swap`;
-            document.getElementById('dynamic-font').href = fontUrl; document.body.style.fontFamily = `'${globalFont}', sans-serif`;
+            document.getElementById('dynamic-font').href = fontUrl; 
+            // อัปเดตฟอนต์เฉพาะบนกล่อง Canvas พรีวิวเท่านั้น (ไม่กวนหลังบ้าน)
+            document.getElementById('canvas').style.fontFamily = `'${globalFont}', sans-serif`;
         }
 
         onValue(ref(db, 'media_library'), (snapshot) => {
@@ -149,7 +155,7 @@
                             <div class="media-actions"><button onclick="renameMedia('${key}', '${file.name}')">✏️</button><button class="btn-del" onclick="deleteMedia('${key}', '${file.path}')">🗑️</button></div>
                         </div>`;
                 });
-            } else { list.innerHTML = `<div style="color:#888; font-size:12px; text-align:center;">ยังไม่มีสื่อในระบบ</div>`; }
+            } else { list.innerHTML = `<div style="color:#888; text-align:center;">ยังไม่มีสื่อในระบบ</div>`; }
         });
 
         window.uploadFile = function() {
@@ -222,7 +228,6 @@
             renderCanvas();
         }
 
-        // เพิ่ม Property zIndex ให้กับ Zone เริ่มต้น
         window.addZone = function() { layouts[activeLayoutIndex].zones.push({ id: Date.now(), top: 10, left: 10, width: 40, height: 40, type: 'media', playlist: [], zIndex: 10 }); renderCanvas(); }
         window.addClockZone = function() { layouts[activeLayoutIndex].zones.push({ id: Date.now(), top: 10, left: 10, width: 30, height: 20, type: 'clock', zIndex: 10 }); renderCanvas(); }
         window.addMarqueeZone = function() { layouts[activeLayoutIndex].zones.push({ id: Date.now(), top: 10, left: 10, width: 60, height: 15, type: 'marquee', text: 'ตัววิ่ง...', fontSize: 40, color: '#ffffff', speed: 5, zIndex: 10 }); renderCanvas(); }
@@ -232,14 +237,12 @@
         window.removeMediaFromZone = function(zIdx, mIdx) { layouts[activeLayoutIndex].zones[zIdx].playlist.splice(mIdx, 1); renderCanvas(); }
         window.updateZoneProp = function(zoneIndex, prop, value) { layouts[activeLayoutIndex].zones[zoneIndex][prop] = value; }
         
-        // ฟังก์ชันจัดการ Layer หน้า/หลัง
         window.changeLayer = function(idx, dir) {
             let z = layouts[activeLayoutIndex].zones[idx].zIndex || 10;
             layouts[activeLayoutIndex].zones[idx].zIndex = z + dir;
             renderCanvas();
         }
 
-        // ส่วนสร้าง UI เครื่องมือข้อความบน Sidebar ซ้าย
         function renderZoneEditors() {
             const container = document.getElementById('zone-editors-container');
             const wrapper = document.getElementById('zone-editors-wrapper');
@@ -252,27 +255,24 @@
                     hasTextZones = true;
                     let title = zone.type === 'text' ? 'ข้อความ' : 'ตัววิ่ง';
                     
+                    // ปรับ Layout เป็นแนวตั้ง 1 Column ให้เหมือนด้านบน
                     let html = `
-                    <div style="background:#222; padding:12px; border-radius:6px; margin-bottom:12px; border: 1px solid #4CAF50;">
-                        <div style="font-size:13px; color:#4CAF50; font-weight:bold; margin-bottom:8px;">โซน ${index + 1} (${title})</div>
+                    <div style="background:#222; padding:15px; border-radius:6px; border: 1px solid #4CAF50;">
+                        <div style="font-size:15px; color:#4CAF50; font-weight:bold; margin-bottom:15px;">โซน ${index + 1} (${title})</div>
+                        
+                        <label style="margin-top:0;">ข้อความ:</label>
                         <input type="text" class="inline-input" value="${zone.text || ''}" placeholder="พิมพ์ข้อความที่นี่..." oninput="updateZoneProp(${index}, 'text', this.value); renderCanvas();">
                         
-                        <div class="prop-row">
-                            <div style="display:flex; align-items:center;">
-                                <label style="margin:0; font-size:11px; width:35px;">ขนาด:</label>
-                                <input type="number" class="inline-input" style="width:60px; margin:0;" value="${zone.fontSize || 40}" onchange="updateZoneProp(${index}, 'fontSize', this.value); renderCanvas();">
-                            </div>
-                            <div style="display:flex; align-items:center;">
-                                <label style="margin:0; font-size:11px; width:20px;">สี:</label>
-                                <input type="color" style="width:35px; height:30px; padding:0; cursor:pointer; border:1px solid #555; border-radius:4px;" value="${zone.color || '#ffffff'}" onchange="updateZoneProp(${index}, 'color', this.value); renderCanvas();">
-                            </div>
-                            ${zone.type === 'marquee' ? `
-                            <div style="display:flex; align-items:center;">
-                                <label style="margin:0; font-size:11px; width:35px;">สปีด:</label>
-                                <input type="number" class="inline-input" style="width:50px; margin:0;" value="${zone.speed || 5}" onchange="updateZoneProp(${index}, 'speed', this.value); renderCanvas();">
-                            </div>
-                            ` : ''}
-                        </div>
+                        <label>ขนาดตัวอักษร (px):</label>
+                        <input type="number" class="inline-input" value="${zone.fontSize || 40}" onchange="updateZoneProp(${index}, 'fontSize', this.value); renderCanvas();">
+                        
+                        <label>สีตัวอักษร:</label>
+                        <input type="color" class="inline-input" style="height:40px; padding:2px; cursor:pointer;" value="${zone.color || '#ffffff'}" onchange="updateZoneProp(${index}, 'color', this.value); renderCanvas();">
+                        
+                        ${zone.type === 'marquee' ? `
+                        <label>ความเร็ว (สปีด):</label>
+                        <input type="number" class="inline-input" value="${zone.speed || 5}" onchange="updateZoneProp(${index}, 'speed', this.value); renderCanvas();">
+                        ` : ''}
                     </div>`;
                     container.innerHTML += html;
                 }
@@ -288,7 +288,6 @@
                 const el = document.createElement('div'); el.className = 'zone-box';
                 el.style.top = zone.top + '%'; el.style.left = zone.left + '%'; el.style.width = zone.width + '%'; el.style.height = zone.height + '%';
                 
-                // นำค่า zIndex มาใส่ใน style ของกรอบ
                 el.style.zIndex = zone.zIndex || 10;
                 
                 let innerContent = '';
@@ -304,13 +303,11 @@
                 } else if (zone.type === 'clock') { 
                     innerContent = `<div style="width:100%; height:100%; display:flex; justify-content:center; align-items:center; text-align:center; color:#00bcd4; font-size:24px; font-weight:bold;">⏱️ นาฬิกา</div>`;
                 } else if (zone.type === 'marquee' || zone.type === 'text') {
-                    // กรอบข้อความโล่งๆ ลากปรับขนาดง่าย ไม่มีปุ่มขวาง
                     innerContent = `<div style="width:100%; height:100%; display:flex; justify-content:center; align-items:center; color:${zone.color || '#fff'}; font-size:${zone.fontSize || 40}px; overflow:hidden; text-align:center; white-space:nowrap;">${zone.text || '(ระบุข้อความด้านซ้าย)'}</div>`;
                 }
 
                 let icon = zone.type==='clock'?'⏱️ นาฬิกา': zone.type==='marquee'?'🏃 ตัววิ่ง': zone.type==='text'?'📝 ข้อความ': '🖼️ สื่อ';
                 
-                // ปุ่มควบคุม Layer
                 let layerControls = `
                     <button class="btn-layer" onmousedown="event.stopPropagation(); changeLayer(${index}, 1)" title="นำมาไว้ข้างหน้าสุด">🔼</button>
                     <button class="btn-layer" onmousedown="event.stopPropagation(); changeLayer(${index}, -1)" title="ส่งไปข้างหลัง">🔽</button>
