@@ -12,7 +12,7 @@
         .zone-media.active { opacity: 1; z-index: 2; }
         .zone-media.fade-out { opacity: 0; z-index: 1; }
         
-        /* สไตล์สำหรับปุ่มเริ่มระบบเต็มจอ */
+        /* สไตล์สำหรับปุ่ม Kiosk Mode */
         #start-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.9); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #fff; }
         .btn-start { padding: 20px 40px; font-size: 24px; background: #4CAF50; color: #fff; border: none; border-radius: 10px; cursor: pointer; font-family: 'Prompt', sans-serif; transition: transform 0.2s, background 0.2s; font-weight: bold; }
         .btn-start:hover { background: #45a049; transform: scale(1.05); }
@@ -32,7 +32,6 @@
     <script type="module">
         import { db, ref, onValue, set, onDisconnect } from './firebase-config.js';
 
-        // ฟังก์ชันเมื่อผู้ใช้กดปุ่มเข้าสู่ Kiosk Mode
         window.isAudioUnlocked = false;
         window.startPlayer = function() {
             document.getElementById('start-overlay').style.display = 'none';
@@ -41,7 +40,6 @@
             }
             window.isAudioUnlocked = true;
             
-            // สั่งเปิดเสียงให้วิดีโอที่กำลังเล่นอยู่
             document.querySelectorAll('video').forEach(vid => {
                 vid.muted = false;
             });
@@ -128,6 +126,10 @@
                 zoneDiv.className = 'zone-element';
                 zoneDiv.style.top = zone.top + '%'; zoneDiv.style.left = zone.left + '%';
                 zoneDiv.style.width = zone.width + '%'; zoneDiv.style.height = zone.height + '%';
+                
+                // ใช้ Layer Z-Index แบบเดียวกับตัว Control Panel
+                zoneDiv.style.zIndex = zone.zIndex || 10;
+                
                 container.appendChild(zoneDiv);
 
                 if (zone.type === 'clock') {
@@ -141,7 +143,7 @@
                     uc(); const timer = setInterval(uc, 1000); zoneCleanups.push(() => clearInterval(timer));
                 } 
                 else if (zone.type === 'marquee') {
-                    zoneDiv.innerHTML = `<div style="width:100%; height:100%; display:flex; align-items:center; overflow:hidden; white-space:nowrap; color:${zone.color || '#fff'}; font-size:${zone.fontSize || 40}px; background:rgba(0,0,0,0.5);"><marquee scrollamount="5">${zone.text || ''}</marquee></div>`;
+                    zoneDiv.innerHTML = `<div style="width:100%; height:100%; display:flex; align-items:center; overflow:hidden; white-space:nowrap; color:${zone.color || '#fff'}; font-size:${zone.fontSize || 40}px; background:rgba(0,0,0,0.5);"><marquee scrollamount="${zone.speed || 5}">${zone.text || ''}</marquee></div>`;
                 } 
                 else if (zone.type === 'text') {
                     zoneDiv.innerHTML = `<div style="width:100%; height:100%; display:flex; justify-content:center; align-items:center; color:${zone.color || '#fff'}; font-size:${zone.fontSize || 40}px; text-align:center; padding:10px; box-sizing:border-box; word-break:break-word; text-shadow:0 0 5px #000;">${zone.text || ''}</div>`;
@@ -170,10 +172,7 @@
                     nextElement = document.createElement('video');
                     nextElement.src = item.url; nextElement.className = 'zone-media';
                     nextElement.autoplay = true; 
-                    
-                    // ปลดล็อกเสียงเมื่อผู้ใช้กดปุ่มเริ่มระบบแล้ว
                     nextElement.muted = !window.isAudioUnlocked; 
-                    
                     nextElement.playsInline = true;
                     nextElement.onended = proceedToNext;
                     nextElement.onerror = () => { zoneTimer = setTimeout(proceedToNext, 1000); };
@@ -217,7 +216,7 @@
                 if (currentElement) {
                     if (currentElement.tagName === 'VIDEO') {
                         currentElement.pause();
-                        currentElement.removeAttribute('src'); // เคลียร์ memory
+                        currentElement.removeAttribute('src'); 
                         currentElement.load();
                     }
                     if (currentElement.parentNode) currentElement.parentNode.removeChild(currentElement);
