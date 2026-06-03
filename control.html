@@ -13,7 +13,7 @@
         
         h3 { color: #4CAF50; margin-top: 0; border-bottom: 1px solid #444; padding-bottom: 10px; }
         label { display: block; margin-top: 15px; font-size: 14px; color: #aaa; }
-        button, select, input { font-family: inherit; width: 100%; padding: 8px; margin-top: 5px; background: #3d3d3d; color: white; border: 1px solid #555; border-radius: 4px; cursor: pointer; }
+        button, select, input { font-family: inherit; width: 100%; padding: 8px; margin-top: 5px; background: #3d3d3d; color: white; border: 1px solid #555; border-radius: 4px; cursor: pointer; box-sizing: border-box; }
         button.primary { background: #0078D7; font-weight: bold; } button.primary:hover { background: #005A9E; }
         
         .media-item { background: #444; padding: 8px; margin-top: 8px; border-radius: 4px; display: flex; align-items: center; gap: 10px; font-size: 12px; }
@@ -89,9 +89,11 @@
         <div class="layout-tabs" id="tabs-container"></div>
         <button onclick="addLayout()" style="width: auto; padding: 5px 15px;">+ เพิ่ม Layout ใหม่</button>
         
-        <div style="margin-top: 15px; display: flex; gap: 15px; align-items: center;">
-            <button onclick="addZone()" style="width: auto; margin: 0; background: #ff9800; color:#000;">+ เพิ่มกรอบสื่อ</button>
-            <button onclick="addClockZone()" style="width: auto; margin: 0; background: #00bcd4; color:#000;">+ เพิ่มกรอบนาฬิกา</button>
+        <div style="margin-top: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <button onclick="addZone()" style="width: auto; margin: 0; background: #0078D7; color:#fff;">+ กรอบสื่อ</button>
+            <button onclick="addClockZone()" style="width: auto; margin: 0; background: #00bcd4; color:#000;">+ กรอบนาฬิกา</button>
+            <button onclick="addMarqueeZone()" style="width: auto; margin: 0; background: #9c27b0; color:#fff;">+ กรอบตัววิ่ง</button>
+            <button onclick="addTextZone()" style="width: auto; margin: 0; background: #e91e63; color:#fff;">+ กรอบข้อความ</button>
         </div>
 
         <div id="canvas" class="canvas-wrapper" style="width: 800px; height: 450px;"></div>
@@ -159,36 +161,26 @@
         window.renameMedia = function(k, n) { const n2 = prompt("แก้ไขชื่อไฟล์:", n); if(n2 && n2.trim() !== '') update(ref(db, 'media_library/' + k), { name: n2 }); }
         window.deleteMedia = async function(k, p) { if(confirm("ลบไฟล์นี้ถาวร?")) { try { await deleteObject(storageRef(storage, p)); await remove(ref(db, 'media_library/' + k)); } catch(e){} } }
 
-        // --- ระบบสลับหน้าจอ (เพิ่มโหมดฉุกเฉิน) ---
         window.loadData = function() {
             currentScreen = document.getElementById('screen-select').value;
-            
-            // ปรับ UI ตามโหมดที่เลือก
             if(currentScreen === 'GLOBAL') {
                 document.getElementById('btn-normal-mode').style.display = 'none';
                 document.getElementById('btn-emergency-mode').style.display = 'block';
-                document.body.style.borderTop = '5px solid #d32f2f'; // แถบแดงแจ้งเตือน
+                document.body.style.borderTop = '5px solid #d32f2f';
                 document.getElementById('mode-title').innerHTML = '🚨 ตั้งค่าหน้าจอฉุกเฉิน';
-                
-                // โหลดข้อมูลประกาศฉุกเฉิน
                 onValue(ref(db, 'global_override/config'), (snapshot) => { applyDataToEditor(snapshot.val()); }, { onlyOnce: true });
             } else {
                 document.getElementById('btn-normal-mode').style.display = 'block';
                 document.getElementById('btn-emergency-mode').style.display = 'none';
                 document.body.style.borderTop = '5px solid transparent';
                 document.getElementById('mode-title').innerHTML = '1. ตั้งค่าหน้าจอ';
-                
-                // โหลดข้อมูลจอปกติ
                 onValue(ref(db, 'displays/display_' + currentScreen), (snapshot) => { applyDataToEditor(snapshot.val()); }, { onlyOnce: true });
             }
         }
 
         function applyDataToEditor(data) {
-            if(data && data.layouts) { 
-                orientation = data.orientation || 'landscape'; layouts = data.layouts; globalFont = data.globalFont || 'Prompt';
-            } else { 
-                layouts = [{ id: 'L1', zones: [] }]; orientation = 'landscape'; globalFont = 'Prompt';
-            }
+            if(data && data.layouts) { orientation = data.orientation || 'landscape'; layouts = data.layouts; globalFont = data.globalFont || 'Prompt'; } 
+            else { layouts = [{ id: 'L1', zones: [] }]; orientation = 'landscape'; globalFont = 'Prompt'; }
             document.getElementById('orientation-select').value = orientation; 
             document.getElementById('font-select').value = globalFont;
             window.changeGlobalFont(); activeLayoutIndex = 0; renderTabs(); window.updateCanvas();
@@ -204,29 +196,50 @@
             renderCanvas();
         }
 
+        // Functions เพิ่มกรอบรูปแบบต่างๆ
         window.addZone = function() { layouts[activeLayoutIndex].zones.push({ id: Date.now(), top: 10, left: 10, width: 40, height: 40, type: 'media', playlist: [] }); renderCanvas(); }
         window.addClockZone = function() { layouts[activeLayoutIndex].zones.push({ id: Date.now(), top: 10, left: 10, width: 30, height: 20, type: 'clock' }); renderCanvas(); }
+        window.addMarqueeZone = function() { layouts[activeLayoutIndex].zones.push({ id: Date.now(), top: 10, left: 10, width: 60, height: 10, type: 'marquee', text: 'พิมพ์ข้อความตัววิ่งที่นี่...', speed: 5 }); renderCanvas(); }
+        window.addTextZone = function() { layouts[activeLayoutIndex].zones.push({ id: Date.now(), top: 10, left: 10, width: 30, height: 20, type: 'text', text: 'ข้อความปกติ', fontSize: 40, color: '#ffffff', textAlign: 'center' }); renderCanvas(); }
+        
         window.removeZone = function(idx) { layouts[activeLayoutIndex].zones.splice(idx, 1); renderCanvas(); }
         window.removeMediaFromZone = function(zIdx, mIdx) { layouts[activeLayoutIndex].zones[zIdx].playlist.splice(mIdx, 1); renderCanvas(); }
+        window.updateZoneProp = function(zoneIndex, prop, value) { layouts[activeLayoutIndex].zones[zoneIndex][prop] = value; }
 
         function renderCanvas() {
             const canvas = document.getElementById('canvas'); canvas.innerHTML = '';
             const zones = layouts[activeLayoutIndex].zones || [];
             zones.forEach((zone, index) => {
-                if (!zone.type) zone.type = 'media'; if (!zone.playlist) zone.playlist = [];
+                if (!zone.type) zone.type = 'media';
                 const el = document.createElement('div'); el.className = 'zone-box';
                 el.style.top = zone.top + '%'; el.style.left = zone.left + '%'; el.style.width = zone.width + '%'; el.style.height = zone.height + '%';
+                
                 let innerContent = '';
                 if (zone.type === 'media') {
+                    if (!zone.playlist) zone.playlist = [];
                     el.ondragover = (e) => e.preventDefault();
                     el.ondrop = (e) => { e.preventDefault(); zone.playlist.push({ url: e.dataTransfer.getData('mediaUrl'), type: e.dataTransfer.getData('mediaType'), name: e.dataTransfer.getData('mediaName') || 'ไฟล์สื่อ' }); renderCanvas(); };
                     let bgPreview = '';
                     if(zone.playlist.length > 0) bgPreview = zone.playlist[0].type === 'video' ? `<video src="${zone.playlist[0].url}" autoplay loop muted></video>` : `<img src="${zone.playlist[0].url}">`;
                     let playlistHtml = zone.playlist.map((item, i) => `<div class="zone-media-list-item"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${item.type==='video'?'🎥':'🖼️'} ${item.name}</span><button onmousedown="event.stopPropagation(); removeMediaFromZone(${index}, ${i})" title="ลบไฟล์นี้">❌</button></div>`).join('');
                     innerContent = `${bgPreview}<div class="zone-playlist-ui">${zone.playlist.length === 0 ? '<div style="color:#fff; text-align:center; font-size:12px; margin-top:20px;">ลากไฟล์มาวาง</div>' : playlistHtml}</div>`;
-                } else if (zone.type === 'clock') { innerContent = `<div class="clock-preview">12:30:00<br><span style="font-size:12px;">วันพุธที่ 3 มิถุนายน 2569</span></div>`; }
+                } else if (zone.type === 'clock') { 
+                    innerContent = `<div class="clock-preview">⏱️ นาฬิกาดิจิตอล</div>`; 
+                } else if (zone.type === 'marquee' || zone.type === 'text') {
+                    innerContent = `
+                        <div style="padding:10px; width:100%; box-sizing: border-box;">
+                            <input type="text" value="${zone.text}" onmousedown="event.stopPropagation();" oninput="updateZoneProp(${index}, 'text', this.value)" style="background:#000; border:1px solid #555; color:#fff; margin-bottom:5px;">
+                            ${zone.type === 'text' ? `
+                                <div style="display:flex; gap:5px;">
+                                    <input type="number" value="${zone.fontSize || 40}" placeholder="px" onmousedown="event.stopPropagation();" oninput="updateZoneProp(${index}, 'fontSize', this.value)" style="width:60px;">
+                                    <input type="color" value="${zone.color || '#ffffff'}" onmousedown="event.stopPropagation();" oninput="updateZoneProp(${index}, 'color', this.value)" style="width:40px; padding:0; height:35px;">
+                                </div>
+                            ` : ''}
+                        </div>`;
+                }
 
-                el.innerHTML = `<div class="zone-header" onmousedown="startDrag(event, ${index})"><span>${zone.type === 'clock' ? '⏱️ นาฬิกา' : '🖼️ กรอบสื่อ'}</span><button class="btn-delete-zone" onmousedown="event.stopPropagation(); removeZone(${index})" title="ลบกรอบนี้">✖</button></div><div class="zone-content">${innerContent}</div>`;
+                let headerIcon = zone.type === 'clock' ? '⏱️ นาฬิกา' : zone.type === 'marquee' ? '🏃 ตัววิ่ง' : zone.type === 'text' ? '📝 ข้อความ' : '🖼️ กรอบสื่อ';
+                el.innerHTML = `<div class="zone-header" onmousedown="startDrag(event, ${index})"><span>${headerIcon}</span><button class="btn-delete-zone" onmousedown="event.stopPropagation(); removeZone(${index})" title="ลบกรอบนี้">✖</button></div><div class="zone-content">${innerContent}</div>`;
                 el.onmouseup = () => { let newW = Math.round((el.offsetWidth / canvas.offsetWidth) * 100 / 5) * 5; let newH = Math.round((el.offsetHeight / canvas.offsetHeight) * 100 / 5) * 5; zone.width = Math.max(5, Math.min(newW, 100 - zone.left)); zone.height = Math.max(5, Math.min(newH, 100 - zone.top)); renderCanvas(); };
                 canvas.appendChild(el);
             });
@@ -249,18 +262,12 @@
             set(ref(db, 'displays/display_' + currentScreen), { orientation, globalFont, layouts }).then(() => alert(`ส่งข้อมูลขึ้น ${currentScreen} สำเร็จ!`));
         }
 
-        // ฟังก์ชันสั่งการฉุกเฉิน
         window.startEmergency = function() {
-            set(ref(db, 'global_override/config'), { orientation, globalFont, layouts }).then(() => {
-                update(ref(db, 'global_override'), { isActive: true });
-                alert('🚨 ถ่ายทอดสดประกาศฉุกเฉินไปยังทุกจอเรียบร้อยแล้ว!');
-            });
+            set(ref(db, 'global_override/config'), { orientation, globalFont, layouts }).then(() => { update(ref(db, 'global_override'), { isActive: true }); alert('🚨 ถ่ายทอดสดประกาศฉุกเฉินไปยังทุกจอเรียบร้อยแล้ว!'); });
         }
         
         window.stopEmergency = function() {
-            update(ref(db, 'global_override'), { isActive: false }).then(() => {
-                alert('🛑 ยกเลิกประกาศเรียบร้อย หน้าจอทั้งหมดกลับสู่สถานะปกติ');
-            });
+            update(ref(db, 'global_override'), { isActive: false }).then(() => alert('🛑 ยกเลิกประกาศเรียบร้อย หน้าจอทั้งหมดกลับสู่สถานะปกติ'));
         }
 
         window.onload = loadData;
