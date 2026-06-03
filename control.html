@@ -7,7 +7,7 @@
     <style>
         body { font-family: 'Prompt', sans-serif; background: #1e1e1e; color: #fff; margin: 0; display: flex; height: 100vh; overflow: hidden; transition: all 0.3s; border-top: 5px solid transparent; }
         
-        .sidebar-left { width: 320px; background: #2d2d2d; padding: 20px; overflow-y: auto; border-right: 1px solid #444; flex-shrink: 0; display: flex; flex-direction: column; }
+        .sidebar-left { width: 340px; background: #2d2d2d; padding: 20px; overflow-y: auto; border-right: 1px solid #444; flex-shrink: 0; display: flex; flex-direction: column; }
         .main-workspace { flex-grow: 1; padding: 20px; display: flex; flex-direction: column; overflow-y: auto; background: #1a1a1a; }
         .sidebar-right { width: 320px; background: #2d2d2d; padding: 20px; overflow-y: auto; border-left: 1px solid #444; flex-shrink: 0; }
         
@@ -22,23 +22,27 @@
         .media-actions button { width: auto; padding: 4px 8px; margin: 0; font-size: 10px; }
         .btn-del { background: #d32f2f; } .btn-del:hover { background: #b71c1c; }
 
-        .canvas-wrapper { background: #000; position: relative; margin: 20px auto; border: 2px solid #555; box-shadow: 0 10px 30px rgba(0,0,0,0.5); background-image: linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px); background-size: 5% 5%; }
-        .zone-box { position: absolute; border: 2px solid #4CAF50; resize: both; overflow: hidden; display: flex; flex-direction: column; background: #111; }
-        .zone-header { background: #4CAF50; color: #000; width: 100%; font-size: 12px; font-weight: bold; cursor: move; padding: 4px 0; text-align: center; position: relative; z-index: 10; display: flex; justify-content: space-between; align-items: center; padding: 4px 8px; box-sizing: border-box; }
-        .zone-content { flex-grow: 1; width: 100%; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #000; overflow: hidden; pointer-events: none; }
+        .canvas-wrapper { background: #000; position: relative; margin: 20px auto; border: 2px solid #555; box-shadow: 0 10px 30px rgba(0,0,0,0.5); background-image: linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px); background-size: 5% 5%; overflow: hidden; }
+        .zone-box { position: absolute; border: 2px solid #4CAF50; resize: both; overflow: hidden; display: flex; flex-direction: column; background: rgba(17,17,17,0.8); }
+        .zone-header { background: #4CAF50; color: #000; width: 100%; font-size: 12px; font-weight: bold; cursor: move; padding: 4px 0; text-align: center; position: relative; z-index: 100; display: flex; justify-content: space-between; align-items: center; padding: 4px 8px; box-sizing: border-box; }
+        .zone-content { flex-grow: 1; width: 100%; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; background: transparent; overflow: hidden; pointer-events: none; }
         .zone-content img, .zone-content video { width: 100%; height: 100%; object-fit: fill; position: absolute; top:0; left:0; opacity: 0.4; }
         
         .zone-playlist-ui { position: absolute; top: 10px; bottom: 10px; left: 10px; right: 10px; overflow-y: auto; z-index: 5; pointer-events: auto; }
         .zone-media-list-item { background: rgba(0,0,0,0.8); border: 1px solid #555; padding: 4px 8px; margin-bottom: 4px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; font-size: 11px; }
         .zone-media-list-item button { width: auto; background: none; border: none; padding: 0; margin: 0; font-size: 12px; }
-        .btn-delete-zone { background: #d32f2f; color: white; border: none; font-weight: bold; cursor: pointer; padding: 2px 8px; border-radius: 4px; width: auto; font-size: 10px; pointer-events: auto; }
+        
+        /* ปุ่มจัดการ Layer */
+        .btn-layer { background: rgba(0,0,0,0.3); color: #000; border: none; padding: 2px 6px; border-radius: 3px; cursor: pointer; font-size: 10px; margin-left: 2px; pointer-events: auto; }
+        .btn-layer:hover { background: rgba(0,0,0,0.6); color: #fff; }
+        .btn-delete-zone { background: #d32f2f; color: white; border: none; font-weight: bold; cursor: pointer; padding: 2px 8px; border-radius: 4px; width: auto; font-size: 10px; pointer-events: auto; margin-left: 5px; }
 
         .layout-tabs { display: flex; gap: 5px; margin-bottom: 10px; flex-wrap: wrap; }
         .tab { padding: 8px 15px; background: #333; border-radius: 4px; cursor: pointer; }
         .tab.active { background: #4CAF50; color: #000; font-weight: bold; }
         
-        .inline-input { background:#000; border:1px solid #555; color:#fff; width:100%; margin-bottom:5px; padding: 4px; }
-        .prop-row { display:flex; gap:5px; width: 100%; align-items: center; margin-top:5px; }
+        .inline-input { background:#000; border:1px solid #555; color:#fff; width:100%; margin-bottom:5px; padding: 6px; border-radius:4px; font-family: inherit; }
+        .prop-row { display:flex; gap:10px; width: 100%; align-items: center; margin-top:5px; flex-wrap: wrap; }
     </style>
     <script>if (sessionStorage.getItem('isAdmin') !== 'true') window.location.href = 'index.html';</script>
 </head>
@@ -47,12 +51,13 @@
     <div class="sidebar-left">
         <h3 id="mode-title">1. ตั้งค่าหน้าจอ</h3>
         <label>เลือกจอภาพ / การสั่งการ:</label>
-        <select id="screen-select" onchange="loadData()" style="font-weight: bold;">
+        <select id="screen-select" onchange="loadData()" style="font-weight: bold; background: #333;">
             <option value="01">Screen 01</option> <option value="02">Screen 02</option>
             <option value="03">Screen 03</option> <option value="04">Screen 04</option>
             <option value="05">Screen 05</option> <option value="06">Screen 06</option>
             <option value="07">Screen 07</option> <option value="08">Screen 08</option>
             <option value="09">Screen 09</option> <option value="10">Screen 10</option>
+            <option value="11">Screen 11</option> <option value="12">Screen 12</option>
             <option value="GLOBAL" style="background: #d32f2f; color: #fff;">🚨 ประกาศฉุกเฉิน (ทุกจอ)</option>
         </select>
         
@@ -218,15 +223,24 @@
             renderCanvas();
         }
 
-        window.addZone = function() { layouts[activeLayoutIndex].zones.push({ id: Date.now(), top: 10, left: 10, width: 40, height: 40, type: 'media', playlist: [] }); renderCanvas(); }
-        window.addClockZone = function() { layouts[activeLayoutIndex].zones.push({ id: Date.now(), top: 10, left: 10, width: 30, height: 20, type: 'clock' }); renderCanvas(); }
-        window.addMarqueeZone = function() { layouts[activeLayoutIndex].zones.push({ id: Date.now(), top: 10, left: 10, width: 60, height: 15, type: 'marquee', text: 'ตัววิ่ง...', fontSize: 40, color: '#ffffff' }); renderCanvas(); }
-        window.addTextZone = function() { layouts[activeLayoutIndex].zones.push({ id: Date.now(), top: 10, left: 10, width: 30, height: 20, type: 'text', text: 'ข้อความ', fontSize: 40, color: '#ffffff' }); renderCanvas(); }
+        // เพิ่ม Property zIndex ให้กับ Zone เริ่มต้น
+        window.addZone = function() { layouts[activeLayoutIndex].zones.push({ id: Date.now(), top: 10, left: 10, width: 40, height: 40, type: 'media', playlist: [], zIndex: 10 }); renderCanvas(); }
+        window.addClockZone = function() { layouts[activeLayoutIndex].zones.push({ id: Date.now(), top: 10, left: 10, width: 30, height: 20, type: 'clock', zIndex: 10 }); renderCanvas(); }
+        window.addMarqueeZone = function() { layouts[activeLayoutIndex].zones.push({ id: Date.now(), top: 10, left: 10, width: 60, height: 15, type: 'marquee', text: 'ตัววิ่ง...', fontSize: 40, color: '#ffffff', speed: 5, zIndex: 10 }); renderCanvas(); }
+        window.addTextZone = function() { layouts[activeLayoutIndex].zones.push({ id: Date.now(), top: 10, left: 10, width: 30, height: 20, type: 'text', text: 'ข้อความ', fontSize: 40, color: '#ffffff', zIndex: 10 }); renderCanvas(); }
         
         window.removeZone = function(idx) { layouts[activeLayoutIndex].zones.splice(idx, 1); renderCanvas(); }
         window.removeMediaFromZone = function(zIdx, mIdx) { layouts[activeLayoutIndex].zones[zIdx].playlist.splice(mIdx, 1); renderCanvas(); }
         window.updateZoneProp = function(zoneIndex, prop, value) { layouts[activeLayoutIndex].zones[zoneIndex][prop] = value; }
+        
+        // ฟังก์ชันจัดการ Layer หน้า/หลัง
+        window.changeLayer = function(idx, dir) {
+            let z = layouts[activeLayoutIndex].zones[idx].zIndex || 10;
+            layouts[activeLayoutIndex].zones[idx].zIndex = z + dir;
+            renderCanvas();
+        }
 
+        // ส่วนสร้าง UI เครื่องมือข้อความบน Sidebar ซ้าย
         function renderZoneEditors() {
             const container = document.getElementById('zone-editors-container');
             const wrapper = document.getElementById('zone-editors-wrapper');
@@ -240,14 +254,25 @@
                     let title = zone.type === 'text' ? 'ข้อความ' : 'ตัววิ่ง';
                     
                     let html = `
-                    <div style="background:#333; padding:10px; border-radius:4px; margin-bottom:10px;">
-                        <div style="font-size:12px; color:#aaa; margin-bottom:5px;">โซน ${index + 1} (${title})</div>
-                        <input type="text" class="inline-input" value="${zone.text || ''}" placeholder="พิมพ์ข้อความ..." oninput="updateZoneProp(${index}, 'text', this.value); renderCanvas();">
+                    <div style="background:#222; padding:12px; border-radius:6px; margin-bottom:12px; border: 1px solid #4CAF50;">
+                        <div style="font-size:13px; color:#4CAF50; font-weight:bold; margin-bottom:8px;">โซน ${index + 1} (${title})</div>
+                        <input type="text" class="inline-input" value="${zone.text || ''}" placeholder="พิมพ์ข้อความที่นี่..." oninput="updateZoneProp(${index}, 'text', this.value); renderCanvas();">
+                        
                         <div class="prop-row">
-                            <label style="margin:0; font-size:11px;">ขนาด:</label>
-                            <input type="number" class="inline-input" style="width:60px; margin:0;" value="${zone.fontSize || 40}" onchange="updateZoneProp(${index}, 'fontSize', this.value); renderCanvas();">
-                            <label style="margin:0 0 0 10px; font-size:11px;">สี:</label>
-                            <input type="color" style="width:30px; height:30px; padding:0; cursor:pointer; border:none; background:transparent;" value="${zone.color || '#ffffff'}" onchange="updateZoneProp(${index}, 'color', this.value); renderCanvas();">
+                            <div style="display:flex; align-items:center;">
+                                <label style="margin:0; font-size:11px; width:35px;">ขนาด:</label>
+                                <input type="number" class="inline-input" style="width:60px; margin:0;" value="${zone.fontSize || 40}" onchange="updateZoneProp(${index}, 'fontSize', this.value); renderCanvas();">
+                            </div>
+                            <div style="display:flex; align-items:center;">
+                                <label style="margin:0; font-size:11px; width:20px;">สี:</label>
+                                <input type="color" style="width:35px; height:30px; padding:0; cursor:pointer; border:1px solid #555; border-radius:4px;" value="${zone.color || '#ffffff'}" onchange="updateZoneProp(${index}, 'color', this.value); renderCanvas();">
+                            </div>
+                            ${zone.type === 'marquee' ? `
+                            <div style="display:flex; align-items:center;">
+                                <label style="margin:0; font-size:11px; width:35px;">สปีด:</label>
+                                <input type="number" class="inline-input" style="width:50px; margin:0;" value="${zone.speed || 5}" onchange="updateZoneProp(${index}, 'speed', this.value); renderCanvas();">
+                            </div>
+                            ` : ''}
                         </div>
                     </div>`;
                     container.innerHTML += html;
@@ -264,6 +289,9 @@
                 const el = document.createElement('div'); el.className = 'zone-box';
                 el.style.top = zone.top + '%'; el.style.left = zone.left + '%'; el.style.width = zone.width + '%'; el.style.height = zone.height + '%';
                 
+                // นำค่า zIndex มาใส่ใน style ของกรอบ
+                el.style.zIndex = zone.zIndex || 10;
+                
                 let innerContent = '';
                 
                 if (zone.type === 'media') {
@@ -277,17 +305,30 @@
                 } else if (zone.type === 'clock') { 
                     innerContent = `<div style="width:100%; height:100%; display:flex; justify-content:center; align-items:center; text-align:center; color:#00bcd4; font-size:24px; font-weight:bold;">⏱️ นาฬิกา</div>`;
                 } else if (zone.type === 'marquee' || zone.type === 'text') {
-                    // แสดงผลแบบ Preview ให้อ่านง่าย และจับลากได้ ไม่เกะกะ
+                    // กรอบข้อความโล่งๆ ลากปรับขนาดง่าย ไม่มีปุ่มขวาง
                     innerContent = `<div style="width:100%; height:100%; display:flex; justify-content:center; align-items:center; color:${zone.color || '#fff'}; font-size:${zone.fontSize || 40}px; overflow:hidden; text-align:center; white-space:nowrap;">${zone.text || '(ระบุข้อความด้านซ้าย)'}</div>`;
                 }
 
-                let icon = zone.type==='clock'?'⏱️ นาฬิกา': zone.type==='marquee'?'🏃 ตัววิ่ง': zone.type==='text'?'📝 ข้อความ': '🖼️ รูป/วิดีโอ';
-                el.innerHTML = `<div class="zone-header" onmousedown="startDrag(event, ${index})"><span>${icon}</span><button class="btn-delete-zone" onmousedown="event.stopPropagation(); removeZone(${index})">✖ ลบ</button></div><div class="zone-content">${innerContent}</div>`;
+                let icon = zone.type==='clock'?'⏱️ นาฬิกา': zone.type==='marquee'?'🏃 ตัววิ่ง': zone.type==='text'?'📝 ข้อความ': '🖼️ สื่อ';
+                
+                // ปุ่มควบคุม Layer
+                let layerControls = `
+                    <button class="btn-layer" onmousedown="event.stopPropagation(); changeLayer(${index}, 1)" title="นำมาไว้ข้างหน้าสุด">🔼</button>
+                    <button class="btn-layer" onmousedown="event.stopPropagation(); changeLayer(${index}, -1)" title="ส่งไปข้างหลัง">🔽</button>
+                `;
+
+                el.innerHTML = `
+                <div class="zone-header" onmousedown="startDrag(event, ${index})">
+                    <span style="display:flex; align-items:center;">${icon} ${layerControls}</span>
+                    <button class="btn-delete-zone" onmousedown="event.stopPropagation(); removeZone(${index})">✖ ลบ</button>
+                </div>
+                <div class="zone-content">${innerContent}</div>`;
+                
                 el.onmouseup = () => { let newW = Math.round((el.offsetWidth / canvas.offsetWidth) * 100 / 5) * 5; let newH = Math.round((el.offsetHeight / canvas.offsetHeight) * 100 / 5) * 5; zone.width = Math.max(5, Math.min(newW, 100 - zone.left)); zone.height = Math.max(5, Math.min(newH, 100 - zone.top)); renderCanvas(); };
                 canvas.appendChild(el);
             });
             
-            renderZoneEditors(); // สั่งวาดเมนูแก้ไขข้อความด้านซ้าย
+            renderZoneEditors(); 
         }
 
         window.startDrag = function(e, zoneIndex) {
