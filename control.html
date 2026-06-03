@@ -95,7 +95,8 @@
             <button onclick="addTextZone()" style="width: auto; margin: 0; background: #e91e63; color:#fff;">+ ข้อความ</button>
             <button onclick="addMarqueeZone()" style="width: auto; margin: 0; background: #9c27b0; color:#fff;">+ ตัววิ่ง</button>
             <button onclick="addClockZone()" style="width: auto; margin: 0; background: #00bcd4; color:#000;">+ นาฬิกา</button>
-            <button onclick="addTimerZone()" style="width: auto; margin: 0; background: #4CAF50; color:#fff;">+ ตัวจับเวลา</button>
+            <button onclick="addCountdownZone()" style="width: auto; margin: 0; background: #ff9800; color:#000;">+ นับถอยหลัง</button>
+            <button onclick="addStopwatchZone()" style="width: auto; margin: 0; background: #4CAF50; color:#fff;">+ จับเวลา</button>
         </div>
 
         <div id="canvas" class="canvas-wrapper" style="width: 800px; height: 450px;"></div>
@@ -212,6 +213,7 @@
         window.updateCanvas = function() {
             orientation = document.getElementById('orientation-select').value; 
             if(currentScreen === 'GLOBAL') layouts = globalLayouts[orientation];
+            
             const canvas = document.getElementById('canvas');
             if(orientation === 'landscape') { canvas.style.width = '800px'; canvas.style.height = '450px'; } else { canvas.style.width = '253px'; canvas.style.height = '450px'; }
             renderCanvas();
@@ -222,7 +224,8 @@
         window.addClockZone = function() { layouts[activeLayoutIndex].zones.push({ id: Date.now(), top: 10, left: 10, width: 30, height: 20, type: 'clock', fontSize: 40, color: '#00bcd4' }); renderCanvas(); }
         window.addMarqueeZone = function() { layouts[activeLayoutIndex].zones.push({ id: Date.now(), top: 10, left: 10, width: 60, height: 15, type: 'marquee', text: 'ตัววิ่ง...', speed: 5, fontSize: 30, color: '#ffffff' }); renderCanvas(); }
         window.addTextZone = function() { layouts[activeLayoutIndex].zones.push({ id: Date.now(), top: 10, left: 10, width: 30, height: 20, type: 'text', text: 'ข้อความ', fontSize: 30, color: '#ffffff' }); renderCanvas(); }
-        window.addTimerZone = function() { layouts[activeLayoutIndex].zones.push({ id: Date.now(), top: 10, left: 10, width: 30, height: 25, type: 'timer', mode: 'up', targetTime: '', fontSize: 40, color: '#4caf50' }); renderCanvas(); }
+        window.addCountdownZone = function() { layouts[activeLayoutIndex].zones.push({ id: Date.now(), top: 10, left: 10, width: 40, height: 20, type: 'countdown', durationHours: 0, durationMinutes: 10, targetTime: '', fontSize: 40, color: '#ff9800' }); renderCanvas(); }
+        window.addStopwatchZone = function() { layouts[activeLayoutIndex].zones.push({ id: Date.now(), top: 10, left: 10, width: 30, height: 20, type: 'stopwatch', fontSize: 40, color: '#4caf50' }); renderCanvas(); }
         
         window.removeZone = function(idx) { layouts[activeLayoutIndex].zones.splice(idx, 1); renderCanvas(); }
         window.removeMediaFromZone = function(zIdx, mIdx) { layouts[activeLayoutIndex].zones[zIdx].playlist.splice(mIdx, 1); renderCanvas(); }
@@ -239,8 +242,7 @@
                 let innerContent = '';
                 
                 const renderTools = (showText) => `
-                    <div style="padding:10px; width:100%; box-sizing: border-box; display:flex; flex-direction:column; gap:5px; pointer-events:auto; z-index:20;" 
-                         onmousedown="event.stopPropagation();" onmouseup="event.stopPropagation();">
+                    <div style="padding:10px; width:100%; box-sizing: border-box; display:flex; flex-direction:column; gap:5px; pointer-events:auto; z-index:20;" onmousedown="event.stopPropagation();">
                         ${showText ? `<input type="text" class="inline-input" value="${zone.text || ''}" placeholder="ระบุข้อความ" onchange="updateZoneProp(${index}, 'text', this.value); renderCanvas();">` : ''}
                         <div class="prop-row">
                             <label style="margin:0; font-size:10px;">ขนาด:</label>
@@ -260,39 +262,32 @@
                     innerContent = `${bgPreview}<div class="zone-playlist-ui">${zone.playlist.length === 0 ? '<div style="color:#fff; text-align:center; font-size:12px; margin-top:20px;">ลากไฟล์มาวาง</div>' : playlistHtml}</div>`;
                 } else if (zone.type === 'clock') { 
                     innerContent = `<div style="text-align:center; color:#888; font-size:12px; position:absolute; top:5px; width:100%;">พรีวิวตั้งค่านาฬิกา</div>` + renderTools(false);
-                } else if (zone.type === 'timer') {
+                } else if (zone.type === 'stopwatch') {
+                    innerContent = `<div style="text-align:center; color:#888; font-size:10px; position:absolute; top:2px; width:100%;">จับเวลาเริ่มเมื่อส่งขึ้นจอ</div>` + renderTools(false);
+                } else if (zone.type === 'countdown') {
                     innerContent = `
-                    <div style="padding:10px; width:100%; box-sizing:border-box; pointer-events:auto; z-index:20;" onmousedown="event.stopPropagation();" onmouseup="event.stopPropagation();">
-                        <select class="inline-input" onchange="updateZoneProp(${index}, 'mode', this.value); renderCanvas();">
-                            <option value="up" ${zone.mode === 'up' ? 'selected' : ''}>นับเวลาขึ้น (เริ่มจากเวลาที่เลือก)</option>
-                            <option value="down" ${zone.mode === 'down' ? 'selected' : ''}>นับเวลาลง (ถอยหลังหาเป้าหมาย)</option>
-                        </select>
-                        <input type="datetime-local" class="inline-input" value="${zone.targetTime || ''}" onchange="updateZoneProp(${index}, 'targetTime', this.value); renderCanvas();">
+                    <div style="padding:10px; width:100%; box-sizing: border-box; display:flex; flex-direction:column; gap:5px; pointer-events:auto; z-index:20;" onmousedown="event.stopPropagation();">
+                        <div style="text-align:center; color:#888; font-size:10px; width:100%;">ตั้งเวลานับถอยหลัง (ระบุ ชม. และ นาที)</div>
+                        <div class="prop-row">
+                            <input type="number" placeholder="ชม." class="inline-input" style="width:65px; margin:0;" value="${zone.durationHours || 0}" onchange="updateZoneProp(${index}, 'durationHours', parseInt(this.value)||0); renderCanvas();">
+                            <span style="font-size:11px; color:#aaa;">ชม.</span>
+                            <input type="number" placeholder="นาที" class="inline-input" style="width:65px; margin:0;" value="${zone.durationMinutes || 0}" onchange="updateZoneProp(${index}, 'durationMinutes', parseInt(this.value)||0); renderCanvas();">
+                            <span style="font-size:11px; color:#aaa;">นาที</span>
+                        </div>
                         <div class="prop-row">
                             <label style="margin:0; font-size:10px;">ขนาด:</label>
-                            <input type="number" class="inline-input" style="width:60px; margin:0;" value="${zone.fontSize || 40}" onchange="updateZoneProp(${index}, 'fontSize', this.value); renderCanvas();">
+                            <input type="number" class="inline-input" style="width:60px; margin:0;" value="${zone.fontSize || 30}" onchange="updateZoneProp(${index}, 'fontSize', this.value); renderCanvas();">
                             <label style="margin:0; font-size:10px;">สี:</label>
-                            <input type="color" style="width:30px; height:30px; padding:0; cursor:pointer;" value="${zone.color || '#4caf50'}" onchange="updateZoneProp(${index}, 'color', this.value); renderCanvas();">
+                            <input type="color" style="width:30px; height:30px; padding:0; cursor:pointer;" value="${zone.color || '#ffffff'}" onchange="updateZoneProp(${index}, 'color', this.value); renderCanvas();">
                         </div>
                     </div>`;
-                } else if (zone.type === 'text') {
-                    // แสดงพรีวิวของข้อความจริงที่มีขนาดและสีตามจริงอยู่ข้างหลัง
-                    innerContent = `<div style="position:absolute; top:0; left:0; width:100%; height:100%; display:flex; justify-content:center; align-items:center; color:${zone.color || '#ffffff'}; font-size:${(zone.fontSize || 30)/2}px; text-align:center; opacity:0.5; pointer-events:none; word-break:break-word; padding:10px; box-sizing:border-box;">${zone.text || 'ข้อความพรีวิว'}</div>` + renderTools(true);
-                } else if (zone.type === 'marquee') {
-                    // แสดงพรีวิวของตัววิ่งจริงที่มีขนาดและสีตามจริงอยู่ข้างหลัง
-                    innerContent = `<div style="position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; color:${zone.color || '#ffffff'}; font-size:${(zone.fontSize || 30)/2}px; opacity:0.5; pointer-events:none; white-space:nowrap; overflow:hidden;"><marquee>${zone.text || 'ตัววิ่งพรีวิว...'}</marquee></div>` + renderTools(true);
+                } else if (zone.type === 'marquee' || zone.type === 'text') {
+                    innerContent = renderTools(true);
                 }
 
-                let icon = zone.type==='clock'?'⏱️ นาฬิกา': zone.type==='marquee'?'🏃 ตัววิ่ง': zone.type==='text'?'📝 ข้อความ': zone.type==='timer'?'⏳ จับเวลา': '🖼️ รูป/วิดีโอ';
+                let icon = zone.type==='clock'?'⏱️ นาฬิกา': zone.type==='marquee'?'🏃 ตัววิ่ง': zone.type==='text'?'📝 ข้อความ': zone.type==='countdown'?'⏳ นับถอยหลัง': zone.type==='stopwatch'?'⏱️ จับเวลา': '🖼️ รูป/วิดีโอ';
                 el.innerHTML = `<div class="zone-header" onmousedown="startDrag(event, ${index})"><span>${icon}</span><button class="btn-delete-zone" onmousedown="event.stopPropagation(); removeZone(${index})">✖ ลบ</button></div><div class="zone-content">${innerContent}</div>`;
-                
-                el.onmouseup = () => { 
-                    let newW = Math.round((el.offsetWidth / canvas.offsetWidth) * 100 / 5) * 5; 
-                    let newH = Math.round((el.offsetHeight / canvas.offsetHeight) * 100 / 5) * 5; 
-                    zone.width = Math.max(5, Math.min(newW, 100 - zone.left)); 
-                    zone.height = Math.max(5, Math.min(newH, 100 - zone.top)); 
-                    renderCanvas(); 
-                };
+                el.onmouseup = () => { let newW = Math.round((el.offsetWidth / canvas.offsetWidth) * 100 / 5) * 5; let newH = Math.round((el.offsetHeight / canvas.offsetHeight) * 100 / 5) * 5; zone.width = Math.max(5, Math.min(newW, 100 - zone.left)); zone.height = Math.max(5, Math.min(newH, 100 - zone.top)); renderCanvas(); };
                 canvas.appendChild(el);
             });
         }
@@ -312,7 +307,15 @@
 
         function syncStopwatchTimes(arr) {
             const now = Date.now();
-            arr.forEach(l => { if(l.zones) l.zones.forEach(z => { if(z.type === 'timer') z.startTime = now; }); });
+            arr.forEach(l => { if(l.zones) l.zones.forEach(z => { 
+                if(z.type === 'stopwatch') z.startTime = now; 
+                if(z.type === 'countdown') {
+                    const hrs = parseInt(z.durationHours) || 0;
+                    const mins = parseInt(z.durationMinutes) || 0;
+                    // แปลงระยะเวลาเป็น Timestamp ปลายทางจากจุดเวลานี้
+                    z.targetTime = now + (hrs * 60 * 60 * 1000) + (mins * 60 * 1000);
+                }
+            }); });
         }
 
         window.saveDeploy = function() {
