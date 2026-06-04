@@ -80,10 +80,13 @@
             <option value="Mali">Mali (มะลิ)</option>
         </select>
 
-        <div id="zone-editors-wrapper" style="display:none; margin-top:20px; border-top:1px solid #444; padding-top:15px; flex-grow:1;">
-            <h3 style="color:#ff9800; font-size:18px; margin-bottom:10px;">📝 แก้ไขข้อความในจอ</h3><br>
-            <div id="zone-editors-container" style="display: flex; flex-direction: column; gap: 15px;"></div>
-        </div>
+     <div id="zone-editors-wrapper" style="display:none; margin-top:20px; border-top:1px solid #444; padding-top:15px; flex-grow:1;">
+    <!-- จัดหัวข้อให้อยู่ตรงกลาง และปรับระยะห่างด้านล่าง -->
+    <h3 style="color:#ff9800; font-size:18px; margin-bottom:15px; text-align:center;">📝 แก้ไขข้อความในจอ</h3>
+    
+    <!-- กำหนดให้กล่องเครื่องมือขยายกว้างพอดีกับพื้นที่ -->
+    <div id="zone-editors-container" style="display: flex; flex-direction: column; gap: 15px; width: 100%;"></div>
+</div>
 
         <div id="btn-normal-mode">
             <button onclick="saveDeploy()" class="primary" style="margin-top: 40px; padding: 15px; background: #4CAF50; font-size:18px;">บันทึก & ส่งขึ้นจอ</button>
